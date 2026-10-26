@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mes Flashs">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="icon" type="image/png" href="logo.png">
+<title>Mes Flashs</title>
+<style>
+  :root { --bg:#111; --card:#1e1e1e; --txt:#eee; --acc:#c9a24a; --mute:#333; --ok:#2e9e4f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); overflow:hidden;
+               font-family:-apple-system,system-ui,"Apple Color Emoji",sans-serif; }
+  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--mute); color:var(--txt);
+           cursor:pointer; touch-action:manipulation; }
+  button.primary { background:var(--acc); color:#111; font-weight:600; }
+  button.danger { background:#b3261e; color:#fff; }
+  button.green { background:var(--ok); color:#fff; font-weight:600; }
+  body.locked .admin { display:none !important; }
+  body.noprice .price, body.noprice #viewPrice { display:none !important; }
+
+  /* ===== Structure ===== */
+  #app { position:fixed; inset:0; display:flex; flex-direction:column;
+         padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--mute); flex:none; }
+  #brand { flex:1; display:flex; align-items:center; gap:12px; min-width:0; }
+  #logo { width:52px; height:52px; border-radius:50%; object-fit:cover; }
+  #title { margin:0; font-size:26px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .icon { font-size:22px; width:46px; height:46px; padding:0; }
+  .layout { flex:1; min-height:0; display:flex; position:relative; }
+  #side { width:230px; flex:none; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 10px 40px;
+          border-right:1px solid var(--mute); display:flex; flex-direction:column; gap:6px; }
+  .sideBtn { display:flex; justify-content:space-between; align-items:center; gap:8px; text-align:left;
+             width:100%; padding:12px 14px; font-size:17px; border-radius:12px; background:transparent; flex:none; }
+  .sideBtn .n { opacity:.55; font-size:15px; }
+  .sideBtn.on { background:var(--acc); color:#111; font-weight:600; }
+  .sideBtn.on .n { opacity:.8; }
+  main { flex:1; min-width:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 14px 60px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+  .tile { position:relative; border-radius:12px; overflow:hidden; background:var(--card); transition:opacity .2s, transform .2s; }
+  .tile img { width:100%; aspect-ratio:1; object-fit:cover; display:block; pointer-events:none; }
+  .tile.dragging { opacity:.25; transform:scale(.95); }
+  .price { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.75); color:var(--acc); z-index:4;
+           padding:4px 10px; border-radius:999px; font-weight:700; font-size:15px; }
+  #empty { text-align:center; opacity:.6; padding:40px 20px; }
+
+  /* ===== Tirer pour actualiser ===== */
+  #ptr { position:absolute; top:0; left:50%; z-index:50; transform:translate(-50%,-60px);
+         background:var(--acc); color:#111; font-weight:600; padding:8px 16px; border-radius:999px;
+         pointer-events:none; opacity:0; white-space:nowrap; }
+
+  /* ===== Glisser vers la poubelle ===== */
+  .ghost { position:fixed; width:130px; height:130px; object-fit:cover; border-radius:14px; z-index:800;
+           pointer-events:none; transform:translate(-50%,-50%) scale(1.05); box-shadow:0 10px 30px rgba(0,0,0,.7); opacity:.92; }
+  #trash { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 40px);
+           z-index:790; display:none; align-items:center; gap:10px; padding:16px 28px; border-radius:999px;
+           background:rgba(40,40,40,.95); border:2px dashed #b3261e; font-size:18px; font-weight:600; }
+  #trash.show { display:flex; }
+  #trash.over { background:#b3261e; border-style:solid; transform:translateX(-50%) scale(1.12); }
+  #trash span { font-size:28px; }
+
+  /* ===== Fenêtres ===== */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); display:none; align-items:center; justify-content:center;
+             z-index:600; padding:20px; }
+  .overlay.open { display:flex; }
+  .box { background:var(--card); border-radius:16px; width:min(600px,100%); max-height:100%; overflow-y:auto;
+         -webkit-overflow-scrolling:touch; padding:20px; }
+  .box h2 { margin-top:0; }
+  label { display:block; margin:14px 0 6px; font-weight:600; }
+  .row { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  input[type=text] { font:inherit; font-size:17px; padding:10px; border-radius:10px; border:0; background:var(--mute);
+                     color:var(--txt); flex:1; min-width:0; -webkit-user-select:text; user-select:text; }
+  select { font:inherit; font-size:17px; padding:10px; border-radius:10px; border:0; background:var(--mute); color:var(--txt); }
+  .check { display:flex; align-items:center; gap:12px; font-size:17px; margin:10px 0; font-weight:600; }
+  .check input { width:26px; height:26px; accent-color:var(--acc); flex:none; }
+  .hint { opacity:.6; font-size:14px; margin:4px 0 8px; }
+  #count { opacity:.7; margin:8px 0; }
+
+  /* Sélecteur de catégories : menu déroulant + bouton + */
+  .catPick { display:flex; flex-direction:column; gap:8px; }
+  .catRow { display:flex; gap:8px; align-items:center; }
+  .catRow select { flex:1; min-width:0; }
+  .catRow button { width:44px; height:44px; padding:0; font-size:20px; flex:none; }
+  .catAdd { align-self:flex-start; }
+
+  /* Réglages du filigrane (par dessin) */
+  .wmBox .wmOpts { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .wmBox .wmOpts.off { opacity:.35; pointer-events:none; }
+  .wmBox .check.small { font-size:15px; margin:0 4px; }
+  .wmBox .check.small input { width:22px; height:22px; }
+
+  /* ===== Réglages ===== */
+  #catDlg { position:fixed; inset:0; z-index:700; background:var(--card); display:none; flex-direction:column; }
+  #catDlg.open { display:flex; }
+  .dlgHead { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:none;
+             padding:calc(env(safe-area-inset-top) + 14px) 20px 14px; border-bottom:1px solid var(--mute); }
+  .dlgHead h2 { margin:0; }
+  .dlgBody { flex:1 1 auto; height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 20px 80px; }
+  .dlgInner { max-width:640px; margin:0 auto; }
+  h3.sec { margin:24px 0 6px; font-size:18px; color:var(--acc); }
+  .grid2 { display:grid; grid-template-columns:auto 1fr; gap:10px 14px; align-items:center; }
+  .grid2 span { font-size:16px; opacity:.85; }
+  .catline { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid var(--mute); }
+  .catline span { flex:1; font-size:17px; }
+
+  /* ===== Visionneuse ===== */
+  #viewer { position:fixed; inset:0; z-index:500; background:#000; display:none; flex-direction:column;
+            padding:calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 20px); }
+  #viewer.open { display:flex; }
+  .imgwrap { flex:1; min-height:0; position:relative; }
+  #viewImg { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; transition:opacity .4s; }
+  .nav { position:absolute; top:50%; transform:translateY(-50%); font-size:34px; width:60px; height:80px;
+         background:rgba(255,255,255,.12); z-index:5; }
+  #prevBtn { left:0; } #nextBtn { right:0; }
+  #viewTags { text-align:center; font-size:16px; opacity:.75; padding:6px 0 0; }
+  #editPanel { display:none; max-height:42vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+               background:var(--card); border-radius:14px; padding:12px 16px; margin-top:8px; }
+  body.editing #editPanel { display:block; }
+  #editPanel h4 { margin:10px 0 6px; color:var(--acc); font-size:15px; }
+  #editPanel h4:first-child { margin-top:0; }
+  #ctrlBar { align-self:center; display:flex; align-items:center; gap:10px; margin-top:8px; z-index:20;
+             background:rgba(255,255,255,.08); border-radius:999px; padding:6px 8px 6px 18px; }
+  #viewPrice { color:var(--acc); font-size:20px; font-weight:700; white-space:nowrap; padding-right:6px; }
+  #viewPrice:empty { display:none; }
+  .round { width:46px; height:46px; padding:0; border-radius:50%; display:flex; align-items:center; justify-content:center;
+           background:rgba(255,255,255,.16); flex:none; font-size:20px; }
+  .round svg { width:22px; height:22px; fill:#fff; pointer-events:none; }
+  .round.del { background:#b3261e; }
+  body.editing #editBtn { background:var(--acc); }
+
+  /* Diaporama */
+  body.playing #viewer { padding:0; }
+  body.playing .nav, body.playing #viewer .admin, body.playing #viewTags, body.playing #editPanel { display:none !important; }
+  body.playing #ctrlBar { position:absolute; left:50%; transform:translateX(-50%);
+                          bottom:calc(env(safe-area-inset-bottom) + 14px); margin:0; background:rgba(0,0,0,.6); }
+  body.playing .round { width:40px; height:40px; background:rgba(255,255,255,.14); }
+  body.playing .round svg { width:18px; height:18px; }
+
+  /* ===== Clavier à chiffres ===== */
+  #pinDlg { z-index:900; }
+  #pinDlg .box { width:min(340px,100%); text-align:center; }
+  #pinDots { font-size:34px; letter-spacing:10px; min-height:46px; margin:6px 0 12px; }
+  #pinPad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  #pinPad button { font-size:28px; height:64px; }
+
+  /* ===== Filigrane (réglé dessin par dessin) ===== */
+  .wm { position:absolute; inset:0; pointer-events:none; z-index:3; display:none; overflow:hidden;
+        --wmOp:.25; --wmW:14%; --wmTile:90px; }
+  body.wmShow .wm.on { display:block; }
+  .wm .logo { position:absolute; width:var(--wmW); aspect-ratio:1; opacity:var(--wmOp);
+              background:url(logo.png) center/contain no-repeat; }
+  .wm[data-wp="tl"] .logo { top:3%; left:3%; }
+  .wm[data-wp="tr"] .logo { top:3%; right:3%; }
+  .wm[data-wp="bl"] .logo { bottom:3%; left:3%; }
+  .wm[data-wp="br"] .logo { bottom:3%; right:3%; }
+  .wm[data-wp="c"]  .logo { top:50%; left:50%; transform:translate(-50%,-50%); width:calc(var(--wmW) * 2); }
+  .wm[data-wp="diag"] .logo { inset:-60%; width:auto; aspect-ratio:auto; background-repeat:repeat;
+                              background-size:var(--wmTile); transform:rotate(-30deg); }
+  .tile .wm[data-wp="diag"] .logo { background-size:calc(var(--wmTile) / 2); }
+  /* Bande diagonale : une seule ligne de logos qui traverse le dessin */
+  .wm[data-wp="band"] .logo { left:-30%; right:-30%; top:50%; width:auto; aspect-ratio:auto; height:var(--wmTile);
+                              background-repeat:repeat-x; background-size:auto 100%; background-position:center;
+                              transform:translateY(-50%) rotate(-30deg); }
+  .tile .wm[data-wp="band"] .logo { height:calc(var(--wmTile) / 2); }
+  /* Logo seul, incliné au centre */
+  .wm[data-wp="tilt"] .logo { top:50%; left:50%; width:calc(var(--wmW) * 2.2); transform:translate(-50%,-50%) rotate(-30deg); }
+  /* Export / import */
+  .ioBtns { display:flex; flex-wrap:wrap; gap:10px; }
+  #ioStatus { margin-top:8px; font-size:15px; color:var(--acc); min-height:20px; }
+  .wm .copy { position:absolute; left:3%; bottom:3%; color:#fff; font-size:12px; font-weight:500;
+              opacity:.5; text-shadow:0 0 3px #000; letter-spacing:.5px; white-space:nowrap; }
+  .wm[data-wp="bl"] .copy { left:auto; right:3%; }
+  .wm.nocopy .copy, .tile .wm .copy { display:none; }
+  #viewWm { inset:auto; transition:opacity .4s; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div id="brand">
+      <img id="logo" src="logo.png" alt="" onerror="this.style.display='none'">
+      <h1 id="title">Mes dessins</h1>
+    </div>
+    <button type="button" class="icon" id="playBtn" title="Diaporama">▶️</button>
+    <button type="button" class="icon admin" id="lockBtn" title="Mode convention">🔒</button>
+    <button type="button" class="icon admin" id="catBtn" title="Reglages">⚙️</button>
+    <button type="button" class="icon primary admin" id="addBtn" title="Ajouter">＋</button>
+  </header>
+  <div class="layout">
+    <aside id="side"></aside>
+    <main id="main">
+      <div id="grid"></div>
+      <p id="empty" hidden>Aucun dessin ici.</p>
+    </main>
+    <div id="ptr">↓ Tirer pour actualiser</div>
+  </div>
+</div>
+
+<!-- Poubelle (glisser-déposer) -->
+<div id="trash"><span>🗑️</span> Glisse ici pour supprimer</div>
+
+<!-- Ajout -->
+<div class="overlay" id="addDlg">
+  <div class="box">
+    <h2>Ajouter des dessins</h2>
+    <button type="button" class="primary" id="pickBtn">📷 Choisir des photos</button>
+    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    <p id="count">0 photo sélectionnée</p>
+    <label>Catégories</label>
+    <div id="addCats"></div>
+    <label>Prix (facultatif)</label>
+    <input type="text" id="addPrice" placeholder="ex : 80  ou  à partir de 120 €">
+    <p class="hint">Le même prix et les mêmes réglages seront appliqués à toutes les photos sélectionnées. Modifiables ensuite.</p>
+    <label>Filigrane</label>
+    <div id="addWmBox" class="wmBox"></div>
+    <div class="row">
+      <button type="button" id="addCancel">Annuler</button>
+      <button type="button" class="primary" id="addOk">Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visionneuse -->
+<div id="viewer">
+  <div class="imgwrap">
+    <img id="viewImg" alt="">
+    <div class="wm" id="viewWm"></div>
+    <button type="button" class="nav" id="prevBtn">‹</button>
+    <button type="button" class="nav" id="nextBtn">›</button>
+  </div>
+  <div id="viewTags"></div>
+  <div id="editPanel" class="admin">
+    <h4>💶 Prix</h4>
+    <div class="row" style="margin-top:0;justify-content:stretch">
+      <input type="text" id="editPrice" placeholder="Prix (facultatif)">
+      <button type="button" class="green" id="savePrice">💾 Enregistrer</button>
+    </div>
+    <h4>🗂️ Catégories</h4>
+    <div id="viewCats"></div>
+    <h4>© Filigrane</h4>
+    <div id="viewWmBox" class="wmBox"></div>
+  </div>
+  <div id="ctrlBar">
+    <span id="viewPrice"></span>
+    <button type="button" class="round admin" id="editBtn" aria-label="Modifier">✏️</button>
+    <button type="button" class="round del admin" id="delBtn" aria-label="Supprimer">
+      <svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9z"/></svg>
+    </button>
+    <button type="button" class="round" id="slideBtn" aria-label="Lecture / Pause"></button>
+    <button type="button" class="round" id="closeBtn" aria-label="Fermer">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Réglages -->
+<div id="catDlg">
+  <div class="dlgHead">
+    <h2>⚙️ Réglages</h2>
+    <button type="button" class="primary" id="catClose">Terminé</button>
+  </div>
+  <div class="dlgBody"><div class="dlgInner">
+    <h3 class="sec">🏷️ Titre affiché</h3>
+    <div class="row" style="justify-content:stretch;margin-top:0">
+      <input type="text" id="titleInput" placeholder="ex : LP Ink">
+      <button type="button" class="green" id="titleSave">💾 Enregistrer</button>
+    </div>
+
+    <h3 class="sec">💶 Prix</h3>
+    <label class="check"><input type="checkbox" id="showPrices"> Afficher les prix</label>
+
+    <h3 class="sec">© Filigrane</h3>
+    <label class="check"><input type="checkbox" id="showWm"> Afficher le filigrane</label>
+    <p class="hint">La position, la taille et l'intensité se règlent sur chaque dessin (bouton ✏️ quand un dessin est ouvert).</p>
+
+    <h3 class="sec">▶️ Diaporama</h3>
+    <div class="grid2">
+      <span>Temps par dessin</span>
+      <select id="slideDelay">
+        <option value="3">3 secondes</option>
+        <option value="5">5 secondes</option>
+        <option value="8">8 secondes</option>
+        <option value="12">12 secondes</option>
+        <option value="20">20 secondes</option>
+      </select>
+      <span>Relance auto</span>
+      <select id="autoRestart">
+        <option value="0">Désactivée</option>
+        <option value="30">Après 30 secondes</option>
+        <option value="60">Après 1 minute</option>
+        <option value="120">Après 2 minutes</option>
+        <option value="300">Après 5 minutes</option>
+      </select>
+    </div>
+    <p class="hint">Si le diaporama a été lancé puis mis en pause ou fermé, il redémarre tout seul quand personne ne touche l'écran pendant ce temps.</p>
+
+    <h3 class="sec">📦 Sauvegarde / transfert</h3>
+    <p class="hint">Exporte tout (dessins, prix, catégories, filigranes, réglages) dans un fichier, puis importe-le sur un autre appareil (ex : préparer sur PC, importer sur l'iPad).</p>
+    <div class="ioBtns">
+      <button type="button" class="green" id="exportBtn">⬇️ Exporter</button>
+      <button type="button" class="primary" id="importBtn">⬆️ Importer</button>
+    </div>
+    <input type="file" id="importInput" accept=".json,application/json" hidden>
+    <div id="ioStatus"></div>
+
+    <h3 class="sec">🗂️ Catégories</h3>
+    <p class="hint">Astuce : touche 🌐 ou 😀 sur le clavier pour ajouter des smileys (ex : 🌸 Florale).</p>
+    <div id="catList"></div>
+    <div class="row" style="justify-content:stretch">
+      <input type="text" id="catInput" placeholder="Nouvelle catégorie (ex : 🌙 Signe astro)">
+      <button type="button" class="primary" id="catAdd">Ajouter</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Clavier à chiffres -->
+<div class="overlay" id="pinDlg">
+  <div class="box">
+    <h2 id="pinTitle">Code</h2>
+    <div id="pinDots"></div>
+    <div id="pinPad"></div>
+    <div class="row" style="justify-content:center">
+      <button type="button" id="pinCancel">Annuler</button>
+      <button type="button" class="primary" id="pinOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CATS = ["🌸 Florale","🌙 Signe astro","✨ Minimaliste","⚓ Old school","🐉 Japonais",
+                      "✍️ Lettrage","🐾 Animaux","🔷 Géométrique","📷 Réaliste","❓ Autre"];
+let cats = JSON.parse(localStorage.getItem("cats") || "null") || DEFAULT_CATS;
+let filter = null, photos = [], db, pending = [], current = null, viewList = [];
+let getAddCats = () => [], addWmCfg = {}, viewerDirty = false;
+const urls = new Map();
+const $ = id => document.getElementById(id);
+const LS = (k, d) => { const v = localStorage.getItem(k); return v === null ? d : v; };
+const isLocked = () => LS("locked", "0") === "1";
+const isOpen = id => $(id).classList.contains("open");
+const openP = id => $(id).classList.add("open");
+const closeP = id => $(id).classList.remove("open");
+function mk(tag, props) { const e = document.createElement(tag); Object.assign(e, props || {}); return e; }
+
+/* ---------- Titre ---------- */
+const currentTitle = () => LS("title", "") || "Mes dessins";
+function applyTitle() { $("title").textContent = currentTitle(); }
+
+/* ---------- Filigrane (réglé par dessin) ---------- */
+const WM_SIZES = { s: ["9%", "60px"], m: ["14%", "90px"], l: ["22%", "140px"] };
+const WM_DEF = Object.assign({ wmPos: "br", wmSize: "m", wmOp: "0.25", wmCopy: true },
+                             JSON.parse(LS("wmDef", "{}")));
+const showWm = () => LS("showWm", "1") === "1";
+function applyShowWm() { document.body.classList.toggle("wmShow", showWm()); }
+$("showWm").onchange = e => { localStorage.setItem("showWm", e.target.checked ? "1" : "0"); applyShowWm(); };
+function wmOf(p) {
+  return {
+    wm: p.wm !== false,
+    wmPos: p.wmPos || WM_DEF.wmPos,
+    wmSize: p.wmSize || WM_DEF.wmSize,
+    wmOp: p.wmOp || WM_DEF.wmOp,
+    wmCopy: p.wmCopy === undefined ? WM_DEF.wmCopy : p.wmCopy
+  };
+}
+function applyWmEl(el, p) {
+  const c = wmOf(p), sz = WM_SIZES[c.wmSize] || WM_SIZES.m;
+  el.classList.add("wm");
+  el.classList.toggle("on", c.wm);
+  el.classList.toggle("nocopy", !c.wmCopy);
+  el.dataset.wp = c.wmPos;
+  el.style.setProperty("--wmW", sz[0]);
+  el.style.setProperty("--wmTile", sz[1]);
+  el.style.setProperty("--wmOp", c.wmOp);
+  const name = LS("title", "");
+  el.innerHTML = '<div class="logo"></div><div class="copy"></div>';
+  el.querySelector(".copy").textContent = "© " + (name ? name + " " : "") + new Date().getFullYear();
+}
+/* Panneau de réglage du filigrane, pour un objet (dessin ou ajout) */
+function wmControls(box, obj, onChange) {
+  const c = wmOf(obj);
+  Object.assign(obj, c);
+  box.innerHTML = `
+    <label class="check" style="margin-top:0"><input type="checkbox" data-k="wm"> Activer le filigrane</label>
+    <div class="wmOpts">
+      <select data-k="wmPos">
+        <option value="br">↘ En bas à droite</option>
+        <option value="bl">↙ En bas à gauche</option>
+        <option value="tr">↗ En haut à droite</option>
+        <option value="tl">↖ En haut à gauche</option>
+        <option value="c">⊙ Au centre</option>
+        <option value="diag">⟋ En diagonale (tout le dessin)</option>
+        <option value="band">⟋ Bande en diagonale</option>
+        <option value="tilt">⤴ Logo incliné au centre</option>
+      </select>
+      <select data-k="wmSize">
+        <option value="s">Petit</option>
+        <option value="m">Moyen</option>
+        <option value="l">Grand</option>
+      </select>
+      <select data-k="wmOp">
+        <option value="0.06">Ultra discret</option>
+        <option value="0.12">Très discret</option>
+        <option value="0.25">Discret</option>
+        <option value="0.4">Moyen</option>
+        <option value="0.6">Fort</option>
+      </select>
+      <label class="check small"><input type="checkbox" data-k="wmCopy"> Texte ©</label>
+    </div>`;
+  const opts = box.querySelector(".wmOpts");
+  box.querySelectorAll("[data-k]").forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === "checkbox") el.checked = !!obj[k]; else el.value = obj[k];
+    el.onchange = () => {
+      obj[k] = el.type === "checkbox" ? el.checked : el.value;
+      opts.classList.toggle("off", !obj.wm);
+      if (onChange) onChange();
+    };
+  });
+  opts.classList.toggle("off", !obj.wm);
+}
+
+/* ---------- Sélecteur de catégories : menu déroulant + bouton + ---------- */
+function catPicker(box, initial, onChange) {
+  let list = initial.filter(c => cats.includes(c));
+  if (!list.length) list = [""];
+  const values = () => cats.filter(c => list.includes(c));
+  function draw() {
+    box.innerHTML = "";
+    const wrap = mk("div", { className: "catPick" });
+    list.forEach((val, i) => {
+      const row = mk("div", { className: "catRow" });
+      const sel = mk("select");
+      sel.append(mk("option", { value: "", textContent: "— Choisir une catégorie —" }));
+      cats.forEach(c => {
+        const used = c !== val && list.includes(c);
+        sel.append(mk("option", { value: c, textContent: c, disabled: used }));
+      });
+      sel.value = val;
+      sel.onchange = () => { list[i] = sel.value; draw(); if (onChange) onChange(values()); };
+      row.append(sel);
+      if (list.length > 1 || val) {
+        row.append(mk("button", { type: "button", className: "danger", textContent: "✕", onclick: () => {
+          list.splice(i, 1); if (!list.length) list = [""];
+          draw(); if (onChange) onChange(values());
+        }}));
+      }
+      wrap.append(row);
+    });
+    if (list.length < cats.length) {
+      wrap.append(mk("button", { type: "button", className: "catAdd", textContent: "＋ Ajouter une catégorie",
+        onclick: () => { list.push(""); draw(); } }));
+    }
+    box.append(wrap);
+  }
+  draw();
+  return values;
+}
+
+/* ---------- Prix ---------- */
+const showPrices = () => LS("showPrices", "1") === "1";
+function applyPrices() { document.body.classList.toggle("noprice", !showPrices()); }
+$("showPrices").onchange = e => { localStorage.setItem("showPrices", e.target.checked ? "1" : "0"); applyPrices(); };
+function fmtPrice(v) {
+  v = (v || "").trim();
+  if (!v) return "";
+  return /^\d+([.,]\d+)?$/.test(v) ? v + " €" : v;
+}
+
+/* ---------- Clavier à chiffres ---------- */
+let pinValue = "", pinResolve = null;
+["1","2","3","4","5","6","7","8","9","","0","⌫"].forEach(k => {
+  const b = mk("button", { type: "button", textContent: k });
+  if (!k) b.style.visibility = "hidden";
+  b.onclick = () => {
+    if (k === "⌫") pinValue = pinValue.slice(0, -1);
+    else if (pinValue.length < 8) pinValue += k;
+    $("pinDots").textContent = "•".repeat(pinValue.length);
+  };
+  $("pinPad").append(b);
+});
+function askPin(title) {
+  pinValue = ""; $("pinDots").textContent = ""; $("pinTitle").textContent = title;
+  openP("pinDlg");
+  return new Promise(res => pinResolve = res);
+}
+$("pinOk").onclick = () => { closeP("pinDlg"); pinResolve(pinValue || null); };
+$("pinCancel").onclick = () => { closeP("pinDlg"); pinResolve(null); };
+
+/* ---------- Mode convention ---------- */
+function applyLock() { document.body.classList.toggle("locked", isLocked()); if (isLocked()) document.body.classList.remove("editing"); }
+$("lockBtn").onclick = async () => {
+  const code = await askPin("Choisis un code (chiffres)");
+  if (!code) return;
+  if (code.length < 4) { alert("Le code doit faire au moins 4 chiffres."); return; }
+  const c2 = await askPin("Confirme le code");
+  if (c2 !== code) { alert("Les codes ne correspondent pas."); return; }
+  localStorage.setItem("code", code); localStorage.setItem("locked", "1"); applyLock(); render();
+  alert("Verrouillé ✅\nPour déverrouiller : touche 5 fois le logo ou le titre, puis entre ton code.");
+};
+let taps = 0, tapTimer;
+$("brand").onclick = async () => {
+  if (!isLocked()) return;
+  taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => taps = 0, 1500);
+  if (taps >= 5) {
+    taps = 0;
+    const c = await askPin("Code de déverrouillage");
+    if (c === null) return;
+    if (c === LS("code", "")) {
+      localStorage.setItem("locked", "0"); autoArmed = false; clearTimeout(idleTimer);
+      applyLock(); render();
+    } else alert("Code incorrect");
+  }
+};
+
+/* ---------- Base locale (IndexedDB, uniquement sur l'iPad) ---------- */
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("tattoos", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("photos", { keyPath: "id" });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const store = mode => db.transaction("photos", mode).objectStore("photos");
+const wait = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+async function loadAll() {
+  photos = await wait(store("readonly").getAll());
+  photos.forEach(p => { if (p.price === undefined) p.price = ""; if (!Array.isArray(p.styles)) p.styles = []; });
+  photos.sort((a, b) => b.date - a.date);
+}
+const savePhoto = p => wait(store("readwrite").put(p));
+const saveCats = () => localStorage.setItem("cats", JSON.stringify(cats));
+async function deletePhoto(p) {
+  await wait(store("readwrite").delete(p.id));
+  if (urls.has(p.id)) { URL.revokeObjectURL(urls.get(p.id)); urls.delete(p.id); }
+  await loadAll(); render();
+}
+
+/* ---------- Réduction des images ---------- */
+function resize(file) {
+  return new Promise(res => {
+    const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 2000 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u);
+      c.toBlob(b => res(b || file), "image/jpeg", 0.88);
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); res(file); };
+    img.src = u;
+  });
+}
+function urlOf(p) {
+  if (!urls.has(p.id)) urls.set(p.id, URL.createObjectURL(p.blob));
+  return urls.get(p.id);
+}
+
+/* ---------- Galerie + bandeau des catégories ---------- */
+function sideBtn(label, n, on, onClick) {
+  const b = mk("button", { type: "button", className: "sideBtn" + (on ? " on" : ""), onclick: onClick });
+  b.append(mk("span", { textContent: label }), mk("span", { className: "n", textContent: n }));
+  return b;
+}
+function render() {
+  const side = $("side"); side.innerHTML = "";
+  side.append(sideBtn("Tous", photos.length, filter === null, () => { filter = null; render(); }));
+  cats.forEach(c => {
+    const n = photos.filter(p => p.styles.includes(c)).length;
+    if (n === 0 && isLocked()) return;
+    side.append(sideBtn(c, n, filter === c, () => { filter = c; render(); }));
+  });
+  viewList = filter ? photos.filter(p => p.styles.includes(filter)) : photos;
+  const g = $("grid"); g.innerHTML = "";
+  viewList.forEach((p, i) => {
+    const tile = mk("div", { className: "tile" });
+    const img = mk("img", { src: urlOf(p), loading: "lazy" });
+    const wm = mk("div"); applyWmEl(wm, p);
+    tile.append(img, wm);
+    const pr = fmtPrice(p.price);
+    if (pr) tile.append(mk("span", { className: "price", textContent: pr }));
+    tile.onclick = () => { if (suppressClick) return; openViewer(i); };
+    setupLongPress(tile, p, img);
+    g.append(tile);
+  });
+  $("empty").hidden = viewList.length > 0;
+}
+
+/* ---------- Appui long + glisser vers la poubelle ---------- */
+let drag = null, suppressClick = false;
+function overTrash(x, y) {
+  const r = $("trash").getBoundingClientRect();
+  return x > r.left - 30 && x < r.right + 30 && y > r.top - 30 && y < r.bottom + 30;
+}
+function startDrag(tile, p, img, x, y) {
+  suppressClick = true;
+  const ghost = mk("img", { src: img.src, className: "ghost" });
+  ghost.style.left = x + "px"; ghost.style.top = y + "px";
+  document.body.append(ghost);
+  tile.classList.add("dragging");
+  $("trash").classList.add("show");
+  drag = { tile, p, ghost };
+}
+function moveDrag(x, y) {
+  drag.ghost.style.left = x + "px"; drag.ghost.style.top = y + "px";
+  $("trash").classList.toggle("over", overTrash(x, y));
+}
+async function endDrag(x, y) {
+  const d = drag, hit = overTrash(x, y);
+  drag = null;
+  d.ghost.remove(); d.tile.classList.remove("dragging");
+  $("trash").classList.remove("show", "over");
+  setTimeout(() => suppressClick = false, 400);
+  if (hit && confirm("Supprimer ce dessin ?")) await deletePhoto(d.p);
+}
+function setupLongPress(tile, p, img) {
+  let timer = null, sx = 0, sy = 0;
+  tile.addEventListener("touchstart", e => {
+    if (isLocked() || e.touches.length > 1) return;
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY;
+    timer = setTimeout(() => startDrag(tile, p, img, sx, sy), 500);
+  }, { passive: true });
+  tile.addEventListener("touchmove", e => {
+    const t = e.touches[0];
+    if (drag && drag.tile === tile) { e.preventDefault(); moveDrag(t.clientX, t.clientY); return; }
+    if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clearTimeout(timer);
+  }, { passive: false });
+  tile.addEventListener("touchend", e => {
+    clearTimeout(timer);
+    if (drag && drag.tile === tile) { e.preventDefault(); const t = e.changedTouches[0]; endDrag(t.clientX, t.clientY); }
+  }, { passive: false });
+  tile.addEventListener("touchcancel", () => { clearTimeout(timer); if (drag && drag.tile === tile) endDrag(-999, -999); });
+  tile.addEventListener("contextmenu", e => e.preventDefault());
+}
+
+/* ---------- Tirer vers le bas pour actualiser ---------- */
+(function () {
+  const main = $("main"), ptr = $("ptr");
+  let y0 = null, dy = 0;
+  const LIMIT = 90;
+  main.addEventListener("touchstart", e => {
+    y0 = (main.scrollTop <= 0 && !drag) ? e.touches[0].clientY : null; dy = 0;
+  }, { passive: true });
+  main.addEventListener("touchmove", e => {
+    if (y0 === null || drag) return;
+    dy = e.touches[0].clientY - y0;
+    if (dy <= 0) { ptr.style.opacity = 0; return; }
+    const off = Math.min(dy / 2, 70);
+    ptr.style.transform = `translate(-50%, ${off - 20}px)`;
+    ptr.style.opacity = Math.min(dy / LIMIT, 1);
+    ptr.textContent = dy > LIMIT ? "↻ Relâcher pour actualiser" : "↓ Tirer pour actualiser";
+  }, { passive: true });
+  main.addEventListener("touchend", () => {
+    if (y0 !== null && dy > LIMIT && !drag) {
+      ptr.textContent = "⏳ Actualisation…";
+      setTimeout(() => location.reload(), 150);
+    } else {
+      ptr.style.opacity = 0; ptr.style.transform = "translate(-50%,-60px)";
+    }
+    y0 = null; dy = 0;
+  });
+})();
+
+/* Recharge automatique des données quand on revient sur l'app */
+async function refreshData() {
+  if (!db || drag || isOpen("viewer") || isOpen("addDlg")) return;
+  cats = JSON.parse(localStorage.getItem("cats") || "null") || cats;
+  applyTitle(); applyLock(); applyPrices(); applyShowWm();
+  await loadAll(); render();
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshData(); });
+window.addEventListener("pageshow", e => { if (e.persisted) refreshData(); });
+
+/* ---------- Ajout ---------- */
+$("addBtn").onclick = () => {
+  autoArmed = false; clearTimeout(idleTimer);
+  pending = [];
+  $("count").textContent = "0 photo sélectionnée";
+  $("addPrice").value = "";
+  getAddCats = catPicker($("addCats"), filter ? [filter] : []);
+  addWmCfg = { wm: true };
+  wmControls($("addWmBox"), addWmCfg);
+  openP("addDlg");
+};
+$("pickBtn").onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => {
+  pending = [...e.target.files];
+  $("count").textContent = `${pending.length} photo(s) sélectionnée(s)`;
+  e.target.value = "";
+};
+$("addCancel").onclick = () => closeP("addDlg");
+$("addOk").onclick = async () => {
+  if (!pending.length) { alert("Choisis au moins une photo."); return; }
+  const btn = $("addOk"); btn.disabled = true; btn.textContent = "Ajout…";
+  try {
+    const price = $("addPrice").value.trim(), styles = getAddCats();
+    const w = { wm: addWmCfg.wm, wmPos: addWmCfg.wmPos, wmSize: addWmCfg.wmSize, wmOp: addWmCfg.wmOp, wmCopy: addWmCfg.wmCopy };
+    localStorage.setItem("wmDef", JSON.stringify({ wmPos: w.wmPos, wmSize: w.wmSize, wmOp: w.wmOp, wmCopy: w.wmCopy }));
+    Object.assign(WM_DEF, { wmPos: w.wmPos, wmSize: w.wmSize, wmOp: w.wmOp, wmCopy: w.wmCopy });
+    let t = Date.now();
+    for (const f of pending) {
+      const blob = await resize(f);
+      await savePhoto(Object.assign({ id: String(t) + Math.random().toString(36).slice(2), blob, styles, price, date: t++ }, w));
+    }
+  } catch (e) { alert("Erreur pendant l'ajout : " + e); }
+  btn.disabled = false; btn.textContent = "Valider";
+  closeP("addDlg");
+  await loadAll(); render();
+};
+
+/* ---------- Visionneuse ---------- */
+let idx = 0;
+function placeWm() {
+  const img = $("viewImg"), w = $("viewWm"), box = img.parentElement;
+  if (!img.naturalWidth || !box.clientWidth) return;
+  const cw = box.clientWidth, ch = box.clientHeight;
+  const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+  const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+  Object.assign(w.style, { left: (cw - iw) / 2 + "px", top: (ch - ih) / 2 + "px", width: iw + "px", height: ih + "px" });
+}
+$("viewImg").addEventListener("load", placeWm);
+window.addEventListener("resize", () => requestAnimationFrame(placeWm));
+
+function updateInfo() {
+  const pr = fmtPrice(current.price);
+  $("viewPrice").textContent = pr ? "Prix : " + pr : "";
+  $("viewTags").textContent = current.styles.join("  ·  ");
+}
+function showCurrent() {
+  current = viewList[idx];
+  if (!current) return;
+  const photo = current;
+  $("viewImg").src = urlOf(photo);
+  applyWmEl($("viewWm"), photo);
+  updateInfo();
+  $("prevBtn").style.visibility = idx > 0 ? "visible" : "hidden";
+  $("nextBtn").style.visibility = idx < viewList.length - 1 ? "visible" : "hidden";
+  if (!playing && !isLocked()) {
+    $("editPrice").value = photo.price || "";
+    catPicker($("viewCats"), photo.styles, async v => {
+      photo.styles = v; updateInfo(); viewerDirty = true; await savePhoto(photo);
+    });
+    wmControls($("viewWmBox"), photo, async () => {
+      applyWmEl($("viewWm"), photo); placeWm(); viewerDirty = true; await savePhoto(photo);
+    });
+  }
+  requestAnimationFrame(placeWm);
+}
+function openViewer(i) { idx = i; viewerDirty = false; openP("viewer"); showCurrent(); }
+function closeViewer() {
+  stopSlide(); exitFS(); closeP("viewer");
+  document.body.classList.remove("editing");
+  if (viewerDirty) { viewerDirty = false; render(); }
+}
+function go(d) { const n = idx + d; if (n >= 0 && n < viewList.length) { idx = n; showCurrent(); } }
+$("prevBtn").onclick = () => go(-1);
+$("nextBtn").onclick = () => go(1);
+let sx = null;
+$("viewImg").addEventListener("touchstart", e => sx = e.touches[0].clientX, { passive: true });
+$("viewImg").addEventListener("touchend", e => {
+  if (sx === null || playing) return;
+  const dx = e.changedTouches[0].clientX - sx; sx = null;
+  if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+});
+$("editBtn").onclick = () => { document.body.classList.toggle("editing"); requestAnimationFrame(placeWm); };
+$("savePrice").onclick = async () => {
+  current.price = $("editPrice").value.trim();
+  await savePhoto(current); updateInfo(); viewerDirty = true;
+  $("savePrice").textContent = "✅ Enregistré";
+  setTimeout(() => $("savePrice").textContent = "💾 Enregistrer", 1200);
+};
+
+const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+$("slideBtn").innerHTML = ICON_PLAY;
+$("closeBtn").onclick = closeViewer;
+$("slideBtn").onclick = () => playing ? stopSlide() : startSlide(false);
+$("delBtn").onclick = async () => {
+  if (!confirm("Supprimer ce dessin ?")) return;
+  const p = current; closeViewer(); await deletePhoto(p);
+};
+
+/* ---------- Plein écran ---------- */
+function enterFS() {
+  const el = document.documentElement, fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (fn && !(document.fullscreenElement || document.webkitFullscreenElement)) {
+    try { const r = fn.call(el); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+  }
+}
+function exitFS() {
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  const fn = document.exitFullscreen || document.webkitExitFullscreen;
+  try { const r = fn.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+document.addEventListener("fullscreenchange", () => requestAnimationFrame(placeWm));
+document.addEventListener("webkitfullscreenchange", () => requestAnimationFrame(placeWm));
+
+/* ---------- Diaporama ---------- */
+let playing = false, slideTimer = null;
+const slideDelay = () => Number(LS("slideDelay", "5")) * 1000;
+function nextSlide() {
+  const img = $("viewImg"), wm = $("viewWm");
+  img.style.opacity = 0; wm.style.opacity = 0;
+  setTimeout(() => { idx = (idx + 1) % viewList.length; showCurrent(); img.style.opacity = 1; wm.style.opacity = 1; }, 400);
+}
+function startSlide(fromStart, auto) {
+  if (!viewList.length) { if (!auto) alert("Aucun dessin à afficher."); return; }
+  if (fromStart || idx >= viewList.length) idx = 0;
+  playing = true; autoArmed = true; clearTimeout(idleTimer);
+  document.body.classList.add("playing");
+  document.body.classList.remove("editing");
+  openP("viewer"); showCurrent(); enterFS();
+  $("slideBtn").innerHTML = ICON_PAUSE;
+  clearInterval(slideTimer); slideTimer = setInterval(nextSlide, slideDelay());
+  requestAnimationFrame(placeWm);
+}
+function stopSlide() {
+  const was = playing;
+  playing = false; document.body.classList.remove("playing");
+  clearInterval(slideTimer); $("slideBtn").innerHTML = ICON_PLAY;
+  $("viewImg").style.opacity = 1; $("viewWm").style.opacity = 1;
+  if (isOpen("viewer")) showCurrent();
+  if (was) armIdle();
+}
+$("playBtn").onclick = () => startSlide(true);
+$("slideDelay").onchange = e => localStorage.setItem("slideDelay", e.target.value);
+
+/* ---------- Relance automatique ---------- */
+let autoArmed = false, idleTimer = null;
+const idleDelay = () => Number(LS("autoRestart", "0")) * 1000;
+function armIdle() {
+  clearTimeout(idleTimer);
+  if (!autoArmed || playing || !idleDelay()) return;
+  idleTimer = setTimeout(() => {
+    if (playing) return;
+    if (isOpen("addDlg") || isOpen("pinDlg") || isOpen("catDlg") || drag) { armIdle(); return; }
+    startSlide(!isOpen("viewer"), true);
+  }, idleDelay());
+}
+["touchstart", "click"].forEach(ev =>
+  document.addEventListener(ev, () => { if (!playing) armIdle(); }, { passive: true, capture: true }));
+$("autoRestart").onchange = e => localStorage.setItem("autoRestart", e.target.value);
+
+/* ---------- Réglages / catégories ---------- */
+async function renameCat(oldName) {
+  const n = (prompt("Nouveau nom (tu peux ajouter des smileys) :", oldName) || "").trim();
+  if (!n || n === oldName) return;
+  if (cats.includes(n)) { alert("Cette catégorie existe déjà."); return; }
+  cats = cats.map(c => c === oldName ? n : c); saveCats();
+  for (const p of photos) if (p.styles.includes(oldName)) { p.styles = p.styles.map(s => s === oldName ? n : s); await savePhoto(p); }
+  if (filter === oldName) filter = n;
+  renderCats(); render();
+}
+function moveCat(i, d) {
+  const j = i + d; if (j < 0 || j >= cats.length) return;
+  [cats[i], cats[j]] = [cats[j], cats[i]]; saveCats(); renderCats(); render();
+}
+function renderCats() {
+  const l = $("catList"); l.innerHTML = "";
+  cats.forEach((c, i) => {
+    const line = mk("div", { className: "catline" });
+    const up = mk("button", { type: "button", textContent: "↑", onclick: () => moveCat(i, -1) });
+    const down = mk("button", { type: "button", textContent: "↓", onclick: () => moveCat(i, 1) });
+    if (i === 0) up.style.visibility = "hidden";
+    if (i === cats.length - 1) down.style.visibility = "hidden";
+    const ren = mk("button", { type: "button", textContent: "✏️", onclick: () => renameCat(c) });
+    const del = mk("button", { type: "button", className: "danger", textContent: "✕", onclick: () => {
+      if (!confirm(`Supprimer la catégorie « ${c} » ? (les dessins restent)`)) return;
+      cats = cats.filter(x => x !== c); saveCats();
+      if (filter === c) filter = null;
+      renderCats(); render();
+    }});
+    line.append(mk("span", { textContent: c }), up, down, ren, del);
+    l.append(line);
+  });
+}
+$("catBtn").onclick = () => {
+  autoArmed = false; clearTimeout(idleTimer);
+  $("titleInput").value = currentTitle();
+  $("showPrices").checked = showPrices();
+  $("showWm").checked = showWm();
+  $("slideDelay").value = LS("slideDelay", "5");
+  $("autoRestart").value = LS("autoRestart", "0");
+  renderCats(); openP("catDlg");
+  $("catDlg").querySelector(".dlgBody").scrollTop = 0;
+};
+$("titleSave").onclick = () => {
+  localStorage.setItem("title", $("titleInput").value.trim()); applyTitle(); render();
+  $("titleInput").value = currentTitle();
+  $("titleSave").textContent = "✅ Enregistré";
+  setTimeout(() => $("titleSave").textContent = "💾 Enregistrer", 1200);
+};
+$("catAdd").onclick = () => {
+  const v = $("catInput").value.trim();
+  if (v && !cats.includes(v)) { cats.push(v); saveCats(); renderCats(); render(); }
+  $("catInput").value = "";
+};
+$("catClose").onclick = () => { closeP("catDlg"); render(); };
+
+/* ---------- Export / import de toute la configuration ---------- */
+const CFG_KEYS = ["title", "showPrices", "showWm", "slideDelay", "autoRestart", "wmDef", "cats"];
+const ioMsg = t => $("ioStatus").textContent = t;
+function blobToDataURL(b) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+}
+async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
+$("exportBtn").onclick = async () => {
+  try {
+    ioMsg("⏳ Préparation de l'export…");
+    const settings = {};
+    CFG_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) settings[k] = v; });
+    const all = await wait(store("readonly").getAll());
+    /* Fichier construit morceau par morceau pour économiser la mémoire */
+    const parts = ['{"app":"mes-flashs","version":1,"date":' + JSON.stringify(new Date().toISOString()) +
+                   ',"settings":' + JSON.stringify(settings) + ',"photos":['];
+    for (let i = 0; i < all.length; i++) {
+      const p = Object.assign({}, all[i]);
+      p.image = await blobToDataURL(p.blob); delete p.blob;
+      parts.push((i ? "," : "") + JSON.stringify(p));
+      ioMsg(`⏳ Export… ${i + 1} / ${all.length}`);
+    }
+    parts.push("]}");
+    const file = new Blob(parts, { type: "application/json" });
+    const name = "mes-flashs-" + new Date().toISOString().slice(0, 10) + ".json";
+    const a = mk("a", { href: URL.createObjectURL(file), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    ioMsg(`✅ ${all.length} dessin(s) exporté(s) : ${name}`);
+  } catch (e) { ioMsg("❌ Erreur pendant l'export : " + e); }
+};
+$("importBtn").onclick = () => $("importInput").click();
+$("importInput").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    ioMsg("⏳ Lecture du fichier…");
+    const data = JSON.parse(await f.text());
+    if (data.app !== "mes-flashs" || !Array.isArray(data.photos)) { ioMsg("❌ Ce fichier n'est pas un export Mes Flashs."); return; }
+    const replace = confirm(`${data.photos.length} dessin(s) trouvé(s).\n\nOK = REMPLACER tout le contenu actuel\nAnnuler = AJOUTER aux dessins actuels`);
+    if (replace) {
+      await wait(store("readwrite").clear());
+      urls.forEach(u => URL.revokeObjectURL(u)); urls.clear();
+      Object.entries(data.settings || {}).forEach(([k, v]) => { if (CFG_KEYS.includes(k)) localStorage.setItem(k, v); });
+    } else {
+      /* Ajout : on fusionne les catégories */
+      const imp = JSON.parse((data.settings || {}).cats || "[]");
+      imp.forEach(c => { if (!cats.includes(c)) cats.push(c); });
+      saveCats();
+    }
+    for (let i = 0; i < data.photos.length; i++) {
+      const p = Object.assign({}, data.photos[i]);
+      p.blob = await dataURLToBlob(p.image); delete p.image;
+      if (!replace) p.id = String(Date.now()) + i + Math.random().toString(36).slice(2);
+      await savePhoto(p);
+      ioMsg(`⏳ Import… ${i + 1} / ${data.photos.length}`);
+    }
+    cats = JSON.parse(localStorage.getItem("cats") || "null") || cats;
+    Object.assign(WM_DEF, JSON.parse(LS("wmDef", "{}")));
+    applyTitle(); applyPrices(); applyShowWm();
+    $("titleInput").value = currentTitle();
+    $("showPrices").checked = showPrices(); $("showWm").checked = showWm();
+    $("slideDelay").value = LS("slideDelay", "5"); $("autoRestart").value = LS("autoRestart", "0");
+    filter = null; await loadAll(); renderCats(); render();
+    ioMsg(`✅ Import terminé : ${data.photos.length} dessin(s).`);
+  } catch (err) { ioMsg("❌ Erreur pendant l'import : " + err); }
+};
+
+/* ---------- Démarrage ---------- */
+(async () => {
+  applyTitle(); applyLock(); applyPrices(); applyShowWm();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  try { db = await openDB(); await loadAll(); } catch (e) { alert("Erreur de stockage : " + e); }
+  render();
+})();
+</script>
+</body>
+</html>
