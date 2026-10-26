@@ -112,7 +112,13 @@
   #viewer { position:fixed; inset:0; z-index:500; background:#000; display:none; flex-direction:column;
             padding:calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 20px); }
   #viewer.open { display:flex; }
-  .imgwrap { flex:1; min-height:0; position:relative; }
+  .imgwrap { flex:1; min-height:0; position:relative; overflow:hidden; }
+  /* Zoom avec les doigts : l'image, le filigrane et le logo 🚫 zooment ensemble */
+  #zoomBox { position:absolute; inset:0; transform-origin:50% 50%; touch-action:none; will-change:transform; }
+  body.zoomed .nav { display:none; }
+  #zoomHint { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:7; pointer-events:none;
+              background:rgba(0,0,0,.6); color:#fff; font-size:14px; padding:6px 12px; border-radius:999px; display:none; }
+  body.zoomed #zoomHint { display:block; }
   #viewImg { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; transition:opacity .4s; }
   .nav { position:absolute; top:50%; transform:translateY(-50%); font-size:34px; width:60px; height:80px;
          background:rgba(255,255,255,.12); z-index:6; }
@@ -273,9 +279,12 @@
 <!-- Visionneuse -->
 <div id="viewer">
   <div class="imgwrap">
-    <img id="viewImg" alt="">
-    <div class="wm" id="viewWm"></div>
-    <div class="wm np" id="viewNp"></div>
+    <div id="zoomBox">
+      <img id="viewImg" alt="">
+      <div class="wm" id="viewWm"></div>
+      <div class="wm np" id="viewNp"></div>
+    </div>
+    <div id="zoomHint">Double-tape pour revenir</div>
     <button type="button" class="nav" id="prevBtn">‹</button>
     <button type="button" class="nav" id="nextBtn">›</button>
   </div>
@@ -853,6 +862,7 @@ function showCurrent() {
   $("viewImg").src = urlOf(photo);
   applyWmEl($("viewWm"), photo);
   applyNpEl($("viewNp"), photo);
+  resetZoom(false);
   updateInfo();
   $("prevBtn").style.visibility = idx > 0 ? "visible" : "hidden";
   $("nextBtn").style.visibility = idx < viewList.length - 1 ? "visible" : "hidden";
@@ -877,19 +887,92 @@ function closeViewer() {
   commitPrice();
   stopSlide(); exitFS(); closeP("viewer");
   document.body.classList.remove("editing");
+  resetZoom(false);
   if (viewerDirty) { viewerDirty = false; render(); }
 }
 function go(d) { const n = idx + d; if (n >= 0 && n < viewList.length) { commitPrice(); idx = n; showCurrent(); } }
 $("prevBtn").onclick = () => go(-1);
 $("nextBtn").onclick = () => go(1);
-let sx = null;
-$("viewImg").addEventListener("touchstart", e => sx = e.touches[0].clientX, { passive: true });
-$("viewImg").addEventListener("touchend", e => {
-  if (sx === null || playing) return;
-  const dx = e.changedTouches[0].clientX - sx; sx = null;
-  if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
-});
-$("editBtn").onclick = () => { document.body.classList.toggle("editing"); requestAnimationFrame(placeWm); };
+
+/* ---------- Zoom avec les doigts (pincer), glisser pour se déplacer, double-tap pour zoomer/dézoomer ---------- */
+let zs = 1, zx = 0, zy = 0, pinch = null, pan = null, swipeX = null, multi = false, lastTap = 0;
+const ZMAX = 5;
+function clampZoom() {
+  const b = $("zoomBox"), mx = b.clientWidth * (zs - 1) / 2, my = b.clientHeight * (zs - 1) / 2;
+  zx = Math.max(-mx, Math.min(mx, zx)); zy = Math.max(-my, Math.min(my, zy));
+}
+function applyZoom(anim) {
+  const b = $("zoomBox");
+  b.style.transition = anim ? "transform .25s" : "none";
+  b.style.transform = zs > 1.001 ? `translate(${zx}px,${zy}px) scale(${zs})` : "";
+  document.body.classList.toggle("zoomed", zs > 1.01);
+}
+function resetZoom(anim) { zs = 1; zx = 0; zy = 0; pinch = pan = null; applyZoom(anim); }
+/* Position d'un point par rapport au centre de la zone image (non zoomée) */
+function rel(x, y) { const r = $("zoomBox").parentElement.getBoundingClientRect(); return { x: x - r.left - r.width / 2, y: y - r.top - r.height / 2 }; }
+function zoomAt(ns, m, anim) {
+  ns = Math.max(1, Math.min(ZMAX, ns));
+  zx = m.x - (m.x - zx) * ns / zs; zy = m.y - (m.y - zy) * ns / zs; zs = ns;
+  clampZoom(); applyZoom(anim);
+}
+(function () {
+  const b = $("zoomBox");
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const mid = t => rel((t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2);
+  b.addEventListener("touchstart", e => {
+    if (playing) return;
+    const t = e.touches;
+    if (t.length === 2) {
+      multi = true; pan = null;
+      pinch = { d: dist(t), s: zs, x: zx, y: zy, m: mid(t) };
+    } else if (t.length === 1) {
+      multi = false;
+      swipeX = t[0].clientX;
+      pan = zs > 1.01 ? { x0: t[0].clientX, y0: t[0].clientY, x: zx, y: zy, moved: false } : null;
+    }
+  }, { passive: true });
+  b.addEventListener("touchmove", e => {
+    if (playing) return;
+    const t = e.touches;
+    if (pinch && t.length === 2) {
+      e.preventDefault();
+      const ns = Math.max(1, Math.min(ZMAX, pinch.s * dist(t) / pinch.d)), m = mid(t);
+      /* Le point sous les doigts reste sous les doigts, et on peut déplacer en même temps */
+      zx = m.x - (pinch.m.x - pinch.x) * ns / pinch.s;
+      zy = m.y - (pinch.m.y - pinch.y) * ns / pinch.s;
+      zs = ns; clampZoom(); applyZoom(false);
+    } else if (pan && t.length === 1) {
+      e.preventDefault();
+      const dx = t[0].clientX - pan.x0, dy = t[0].clientY - pan.y0;
+      if (Math.abs(dx) + Math.abs(dy) > 6) pan.moved = true;
+      zx = pan.x + dx; zy = pan.y + dy; clampZoom(); applyZoom(false);
+    }
+  }, { passive: false });
+  b.addEventListener("touchend", e => {
+    if (playing) return;
+    if (e.touches.length < 2) pinch = null;
+    if (e.touches.length > 0) return;
+    if (zs < 1.05) resetZoom(true);
+    const ct = e.changedTouches[0];
+    /* Double-tap : zoom x2,5 à l'endroit touché, ou retour à la taille normale */
+    const now = Date.now(), moved = pan && pan.moved;
+    if (!multi && !moved && now - lastTap < 300) {
+      lastTap = 0;
+      if (zs > 1.01) resetZoom(true); else zoomAt(2.5, rel(ct.clientX, ct.clientY), true);
+      swipeX = null; pan = null; return;
+    }
+    lastTap = (!multi && !moved) ? now : 0;
+    /* Glisser gauche/droite pour changer de dessin, seulement si on n'est pas zoomé */
+    if (!multi && zs <= 1.01 && swipeX !== null) {
+      const dx = ct.clientX - swipeX;
+      if (Math.abs(dx) > 50) { lastTap = 0; go(dx < 0 ? 1 : -1); }
+    }
+    swipeX = null; pan = null;
+  });
+  window.addEventListener("resize", () => { clampZoom(); applyZoom(false); });
+})();
+
+$("editBtn").onclick = () => { document.body.classList.toggle("editing"); requestAnimationFrame(() => { placeWm(); clampZoom(); applyZoom(false); }); };
 /* Le prix est enregistré automatiquement (en quittant le champ, en changeant de dessin ou en fermant) */
 function commitPrice() {
   if (!current || playing || isLocked() || !document.body.classList.contains("editing")) return;
@@ -943,7 +1026,7 @@ function startSlide(fromStart, auto) {
   playing = true; autoArmed = true; clearTimeout(idleTimer);
   document.body.classList.add("playing");
   document.body.classList.remove("editing");
-  openP("viewer"); showCurrent(); enterFS();
+  openP("viewer"); resetZoom(false); showCurrent(); enterFS();
   $("slideBtn").innerHTML = ICON_PAUSE;
   clearInterval(slideTimer); slideTimer = setInterval(nextSlide, slideDelay());
   requestAnimationFrame(placeWm);
