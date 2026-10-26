@@ -569,8 +569,10 @@ function resize(file) {
     img.src = u;
   });
 }
+/* Les images sont maintenant stockées en données brutes (ArrayBuffer) : plus fiable sur iPad que les Blob */
+function blobOf(p) { return p.buf ? new Blob([p.buf], { type: p.type || "image/jpeg" }) : p.blob; }
 function urlOf(p) {
-  if (!urls.has(p.id)) urls.set(p.id, URL.createObjectURL(p.blob));
+  if (!urls.has(p.id)) urls.set(p.id, URL.createObjectURL(blobOf(p)));
   return urls.get(p.id);
 }
 
@@ -718,7 +720,8 @@ $("addOk").onclick = async () => {
     let t = Date.now();
     for (const f of pending) {
       const blob = await resize(f);
-      await savePhoto(Object.assign({ id: String(t) + Math.random().toString(36).slice(2), blob, styles, price, date: t++ }, w));
+      const buf = await blob.arrayBuffer();
+      await savePhoto(Object.assign({ id: String(t) + Math.random().toString(36).slice(2), buf, type: blob.type || "image/jpeg", styles, price, date: t++ }, w));
     }
   } catch (e) { alert("Erreur pendant l'ajout : " + e); }
   btn.disabled = false; btn.textContent = "＋ Ajouter";
@@ -920,10 +923,64 @@ $("catClose").onclick = () => {
 /* ---------- Export / import de toute la configuration ---------- */
 const CFG_KEYS = ["title", "showPrices", "showWm", "slideDelay", "autoRestart", "wmDef", "cats"];
 const ioMsg = t => $("ioStatus").textContent = t;
-function blobToDataURL(b) {
+function readAsDataURL(b) {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 }
-async function dataURLToBlob(u) { return (await fetch(u)).blob(); }
+function bufToDataURL(buf, type) {
+  const bytes = new Uint8Array(buf); let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return "data:" + (type || "image/jpeg") + ";base64," + btoa(s);
+}
+/* Secours : on redessine l'image affichée dans un canvas (contourne le bug Safari « NotFoundError ») */
+function imgToDataURL(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      try { res(c.toDataURL("image/jpeg", 0.9)); } catch (e) { rej(e); }
+    };
+    img.onerror = () => rej(new Error("image illisible"));
+    img.src = src;
+  });
+}
+/* Essaie plusieurs méthodes, de la plus fidèle à la plus robuste */
+async function photoToDataURL(p) {
+  if (p.buf) return bufToDataURL(p.buf, p.type);
+  try { return await readAsDataURL(p.blob); } catch (e) {}
+  try { return await readAsDataURL(await (await fetch(urlOf(p))).blob()); } catch (e) {}
+  return await imgToDataURL(urlOf(p));
+}
+function dataURLToBuf(u) {
+  const m = /^data:([^;]+);base64,(.*)$/.exec(u);
+  const bin = atob(m[2]); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { buf: bytes.buffer, type: m[1] };
+}
+/* Enregistre le fichier : partage iPad (« Enregistrer dans Fichiers ») ou téléchargement classique sur PC */
+async function saveFile(blob, name) {
+  const file = new File([blob], name, { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return "shared"; }
+    catch (e) {
+      if (e.name === "AbortError") return "cancel";
+      /* Safari exige un nouvel appui après une longue préparation : on affiche un bouton */
+      if (e.name === "NotAllowedError") {
+        const box = $("ioStatus"); box.textContent = "✅ Fichier prêt. ";
+        const b = mk("button", { type: "button", className: "green", textContent: "📤 Enregistrer le fichier" });
+        b.onclick = async () => { try { await navigator.share({ files: [file], title: name });
+          box.textContent = "✅ Export terminé. Choisis « Enregistrer dans Fichiers » pour garder le fichier."; } catch (er) {} };
+        box.append(b);
+        return "tap";
+      }
+    }
+  }
+  const a = mk("a", { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  return "download";
+}
 $("exportBtn").onclick = async () => {
   try {
     ioMsg("⏳ Préparation de l'export…");
@@ -935,17 +992,23 @@ $("exportBtn").onclick = async () => {
                    ',"settings":' + JSON.stringify(settings) + ',"photos":['];
     for (let i = 0; i < all.length; i++) {
       const p = Object.assign({}, all[i]);
-      p.image = await blobToDataURL(p.blob); delete p.blob;
+      const dataUrl = await photoToDataURL(all[i]);
+      delete p.blob; delete p.buf; delete p.type;
+      p.image = dataUrl;
+      /* Répare au passage l'ancien format de stockage */
+      if (!all[i].buf) { try { const r = dataURLToBuf(dataUrl); const fixed = Object.assign({}, all[i], r); delete fixed.blob; await savePhoto(fixed); } catch (e) {} }
       parts.push((i ? "," : "") + JSON.stringify(p));
       ioMsg(`⏳ Export… ${i + 1} / ${all.length}`);
     }
     parts.push("]}");
     const file = new Blob(parts, { type: "application/json" });
     const name = "mes-flashs-" + new Date().toISOString().slice(0, 10) + ".json";
-    const a = mk("a", { href: URL.createObjectURL(file), download: name });
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    ioMsg(`✅ ${all.length} dessin(s) exporté(s) : ${name}`);
+    const how = await saveFile(file, name);
+    if (how === "cancel") { ioMsg("Export annulé."); return; }
+    if (how === "tap") return;
+    ioMsg(how === "shared"
+      ? `✅ ${all.length} dessin(s) exporté(s). Choisis « Enregistrer dans Fichiers » pour garder le fichier.`
+      : `✅ ${all.length} dessin(s) exporté(s) : ${name}`);
   } catch (e) { ioMsg("❌ Erreur pendant l'export : " + e); }
 };
 $("importBtn").onclick = () => $("importInput").click();
@@ -969,7 +1032,7 @@ $("importInput").onchange = async e => {
     }
     for (let i = 0; i < data.photos.length; i++) {
       const p = Object.assign({}, data.photos[i]);
-      p.blob = await dataURLToBlob(p.image); delete p.image;
+      Object.assign(p, dataURLToBuf(p.image)); delete p.image; delete p.blob;
       if (!replace) p.id = String(Date.now()) + i + Math.random().toString(36).slice(2);
       await savePhoto(p);
       ioMsg(`⏳ Import… ${i + 1} / ${data.photos.length}`);
