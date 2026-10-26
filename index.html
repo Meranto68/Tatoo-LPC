@@ -103,8 +103,10 @@
   h3.sec { margin:24px 0 6px; font-size:18px; color:var(--acc); }
   .grid2 { display:grid; grid-template-columns:auto 1fr; gap:10px 14px; align-items:center; }
   .grid2 span { font-size:16px; opacity:.85; }
-  .catline { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid var(--mute); }
+  .catline { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid var(--mute); background:var(--card); }
   .catline span { flex:1; font-size:17px; }
+  .grip { width:44px; height:44px; padding:0; font-size:22px; background:transparent; cursor:grab; touch-action:none; flex:none; }
+  .catline.dragging { opacity:.9; background:#2a2a2a; box-shadow:0 6px 20px rgba(0,0,0,.6); position:relative; z-index:5; border-radius:10px; }
 
   /* ===== Visionneuse ===== */
   #viewer { position:fixed; inset:0; z-index:500; background:#000; display:none; flex-direction:column;
@@ -358,7 +360,7 @@
     <div id="ioStatus"></div>
 
     <h3 class="sec">🗂️ Catégories</h3>
-    <p class="hint">Astuce : touche 🌐 ou 😀 sur le clavier pour ajouter des smileys (ex : 🌸 Florale).</p>
+    <p class="hint">Glisse la poignée ☰ pour changer l'ordre. Astuce : touche 🌐 ou 😀 sur le clavier pour ajouter des smileys.</p>
     <div id="catList"></div>
     <div class="row" style="justify-content:stretch">
       <input type="text" id="catInput" placeholder="Nouvelle catégorie (ex : 🌙 Signe astro)">
@@ -613,7 +615,13 @@ const store = mode => db.transaction("photos", mode).objectStore("photos");
 const wait = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 async function loadAll() {
   photos = await wait(store("readonly").getAll());
-  photos.forEach(p => { if (p.price === undefined) p.price = ""; if (!Array.isArray(p.styles)) p.styles = []; });
+  photos.forEach(p => {
+    if (p.price === undefined) p.price = "";
+    if (!Array.isArray(p.styles)) p.styles = [];
+    /* Nettoie les catégories qui n'existent plus (anciennes suppressions) */
+    const clean = p.styles.filter(s => cats.includes(s));
+    if (clean.length !== p.styles.length) { p.styles = clean; savePhoto(p); }
+  });
   photos.sort((a, b) => b.date - a.date);
 }
 const savePhoto = p => wait(store("readwrite").put(p));
@@ -654,6 +662,7 @@ function sideBtn(label, n, on, onClick) {
   return b;
 }
 function render() {
+  if (filter && !cats.includes(filter)) filter = null;
   const side = $("side"); side.innerHTML = "";
   side.append(sideBtn("Tous", photos.length, filter === null, () => { filter = null; render(); }));
   cats.forEach(c => {
@@ -961,29 +970,63 @@ async function renameCat(oldName) {
   cats = cats.map(c => c === oldName ? n : c); saveCats();
   for (const p of photos) if (p.styles.includes(oldName)) { p.styles = p.styles.map(s => s === oldName ? n : s); await savePhoto(p); }
   if (filter === oldName) filter = n;
-  renderCats(); render();
+  await loadAll(); renderCats(); render();
 }
-function moveCat(i, d) {
-  const j = i + d; if (j < 0 || j >= cats.length) return;
-  [cats[i], cats[j]] = [cats[j], cats[i]]; saveCats(); renderCats(); render();
+/* Supprime une catégorie partout : liste, dessins, filtre, puis rafraîchit tout */
+async function deleteCat(c) {
+  if (!confirm(`Supprimer la catégorie « ${c} » ? (les dessins restent, seule la catégorie leur est retirée)`)) return;
+  cats = cats.filter(x => x !== c); saveCats();
+  for (const p of photos) {
+    if (p.styles.includes(c)) { p.styles = p.styles.filter(s => s !== c); await savePhoto(p); }
+  }
+  if (filter === c) filter = null;
+  await loadAll(); renderCats(); render();
 }
+/* Liste des catégories avec poignée ☰ à glisser pour réordonner */
 function renderCats() {
   const l = $("catList"); l.innerHTML = "";
-  cats.forEach((c, i) => {
+  cats.forEach(c => {
     const line = mk("div", { className: "catline" });
-    const up = mk("button", { type: "button", textContent: "↑", onclick: () => moveCat(i, -1) });
-    const down = mk("button", { type: "button", textContent: "↓", onclick: () => moveCat(i, 1) });
-    if (i === 0) up.style.visibility = "hidden";
-    if (i === cats.length - 1) down.style.visibility = "hidden";
+    line.dataset.cat = c;
+    const grip = mk("button", { type: "button", className: "grip", textContent: "☰", title: "Glisser pour déplacer" });
     const ren = mk("button", { type: "button", textContent: "✏️", onclick: () => renameCat(c) });
-    const del = mk("button", { type: "button", className: "danger", textContent: "✕", onclick: () => {
-      if (!confirm(`Supprimer la catégorie « ${c} » ? (les dessins restent)`)) return;
-      cats = cats.filter(x => x !== c); saveCats();
-      if (filter === c) filter = null;
-      renderCats(); render();
-    }});
-    line.append(mk("span", { textContent: c }), up, down, ren, del);
+    const del = mk("button", { type: "button", className: "danger", textContent: "✕", onclick: () => deleteCat(c) });
+    line.append(grip, mk("span", { textContent: c }), ren, del);
     l.append(line);
+    setupCatDrag(grip, line);
+  });
+}
+function setupCatDrag(grip, line) {
+  const list = $("catList");
+  let startY = 0, active = false;
+  const start = y => { active = true; startY = y; line.classList.add("dragging"); };
+  const move = y => {
+    if (!active) return;
+    line.style.transform = `translateY(${y - startY}px)`;
+    /* Échange avec la ligne voisine quand on la dépasse de moitié */
+    const prev = line.previousElementSibling, next = line.nextElementSibling;
+    const r = line.getBoundingClientRect(), mid = r.top + r.height / 2;
+    if (next && mid > next.getBoundingClientRect().top + next.offsetHeight / 2) {
+      list.insertBefore(next, line); startY += next.offsetHeight; line.style.transform = `translateY(${y - startY}px)`;
+    } else if (prev && mid < prev.getBoundingClientRect().top + prev.offsetHeight / 2) {
+      list.insertBefore(line, prev); startY -= prev.offsetHeight; line.style.transform = `translateY(${y - startY}px)`;
+    }
+  };
+  const end = () => {
+    if (!active) return;
+    active = false; line.classList.remove("dragging"); line.style.transform = "";
+    cats = [...list.children].map(el => el.dataset.cat); saveCats(); render();
+  };
+  grip.addEventListener("touchstart", e => { e.preventDefault(); start(e.touches[0].clientY); }, { passive: false });
+  grip.addEventListener("touchmove", e => { e.preventDefault(); move(e.touches[0].clientY); }, { passive: false });
+  grip.addEventListener("touchend", end);
+  grip.addEventListener("touchcancel", end);
+  /* Souris (PC) */
+  grip.addEventListener("mousedown", e => {
+    e.preventDefault(); start(e.clientY);
+    const mm = ev => move(ev.clientY);
+    const mu = () => { end(); document.removeEventListener("mousemove", mm); document.removeEventListener("mouseup", mu); };
+    document.addEventListener("mousemove", mm); document.addEventListener("mouseup", mu);
   });
 }
 $("catBtn").onclick = () => {
@@ -1090,7 +1133,9 @@ $("exportBtn").onclick = async () => {
     }
     parts.push("]}");
     const file = new Blob(parts, { type: "application/json" });
-    const name = "mes-flashs-" + new Date().toISOString().slice(0, 10) + ".json";
+    /* Nom : année-mois-jour-heure, ex : mes-flashs-2026-10-26-14h35.json */
+    const d = new Date(), z = n => String(n).padStart(2, "0");
+    const name = `mes-flashs-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}h${z(d.getMinutes())}.json`;
     const how = await saveFile(file, name);
     if (how === "cancel") { ioMsg("Export annulé."); return; }
     if (how === "tap") return;
@@ -1112,6 +1157,7 @@ $("importInput").onchange = async e => {
       await wait(store("readwrite").clear());
       urls.forEach(u => URL.revokeObjectURL(u)); urls.clear();
       Object.entries(data.settings || {}).forEach(([k, v]) => { if (CFG_KEYS.includes(k)) localStorage.setItem(k, v); });
+      cats = JSON.parse(localStorage.getItem("cats") || "null") || cats;
     } else {
       /* Ajout : on fusionne les catégories */
       const imp = JSON.parse((data.settings || {}).cats || "[]");
@@ -1125,7 +1171,6 @@ $("importInput").onchange = async e => {
       await savePhoto(p);
       ioMsg(`⏳ Import… ${i + 1} / ${data.photos.length}`);
     }
-    cats = JSON.parse(localStorage.getItem("cats") || "null") || cats;
     Object.assign(WM_DEF, JSON.parse(LS("wmDef", "{}")));
     applyTitle(); applyPrices(); applyShowWm();
     $("titleInput").value = currentTitle();
