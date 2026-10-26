@@ -46,16 +46,17 @@
   label { display:block; margin:14px 0 6px; font-weight:600; }
   .row { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; align-items:center; }
 
-  /* Réglages : en-tête fixe + contenu qui défile */
-  #catDlg { padding:0; overflow:hidden; }
-  #catDlg[open] { display:flex; flex-direction:column; }
-  .dlgHead { display:flex; align-items:center; justify-content:space-between; gap:10px;
-             padding:16px 20px; border-bottom:1px solid var(--mute); flex:none; }
+  /* Réglages : panneau plein écran (plus fiable que les fenêtres sur iPad) */
+  #catDlg { position:fixed; inset:0; z-index:1000; background:var(--card); color:var(--txt);
+            display:none; flex-direction:column; }
+  #catDlg.open { display:flex; }
+  body.noscroll { overflow:hidden; }
+  .dlgHead { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:none;
+             padding:calc(env(safe-area-inset-top) + 14px) 20px 14px; border-bottom:1px solid var(--mute); background:var(--card); }
   .dlgHead h2 { margin:0; }
-  .dlgBody { flex:1; min-height:0; overflow-y:scroll; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
-             touch-action:pan-y; padding:4px 20px 30px; }
-  .dlgBody::-webkit-scrollbar { width:8px; }
-  .dlgBody::-webkit-scrollbar-thumb { background:#666; border-radius:4px; }
+  .dlgBody { flex:1 1 auto; height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+             padding:4px 20px calc(env(safe-area-inset-bottom) + 60px); }
+  .dlgInner { max-width:640px; margin:0 auto; }
   h3.sec { margin:22px 0 6px; font-size:18px; color:var(--acc); }
 
   /* Visionneuse */
@@ -123,7 +124,7 @@
   </div>
   <button class="icon" id="playBtn" title="Diaporama">▶️</button>
   <button class="icon admin" id="lockBtn" title="Mode convention">🔒</button>
-  <button class="icon admin" id="catBtn" title="Réglages">⚙︎</button>
+  <button class="icon admin" id="catBtn" title="Reglages">⚙︎</button>
   <button class="icon primary admin" id="addBtn" title="Ajouter">＋</button>
 </header>
 <nav class="chips" id="filters"></nav>
@@ -177,12 +178,12 @@
 </dialog>
 
 <!-- Réglages -->
-<dialog id="catDlg">
+<div id="catDlg">
   <div class="dlgHead">
     <h2>⚙︎ Réglages</h2>
     <button class="primary" id="catClose">Terminé</button>
   </div>
-  <div class="dlgBody">
+  <div class="dlgBody"><div class="dlgInner">
     <h3 class="sec">🏷️ Titre affiché</h3>
     <div class="row" style="justify-content:stretch;margin-top:0">
       <input type="text" id="titleInput" placeholder="ex : LP Ink">
@@ -223,7 +224,8 @@
       <button class="primary" id="catAdd">Ajouter</button>
     </div>
   </div>
-</dialog>
+  </div>
+</div>
 
 <!-- Clavier à chiffres (code de verrouillage) -->
 <dialog id="pinDlg">
@@ -574,7 +576,7 @@ function armIdle() {
   if (!autoArmed || playing || !idleDelay()) return;
   idleTimer = setTimeout(() => {
     if (playing) return;
-    if (["addDlg", "catDlg", "pinDlg"].some(id => $(id).open)) { armIdle(); return; }
+    if ($("addDlg").open || $("pinDlg").open || $("catDlg").classList.contains("open")) { armIdle(); return; }
     startSlide(!$("viewer").open, true);
   }, idleDelay());
 }
@@ -625,7 +627,8 @@ $("catBtn").onclick = () => {
   $("showWm").checked = showWm();
   $("slideDelay").value = localStorage.getItem("slideDelay") || "5";
   $("autoRestart").value = localStorage.getItem("autoRestart") || "0";
-  renderCats(); $("catDlg").showModal();
+  renderCats();
+  $("catDlg").classList.add("open"); document.body.classList.add("noscroll");
   $("catDlg").querySelector(".dlgBody").scrollTop = 0;
 };
 $("titleSave").onclick = () => {
@@ -639,7 +642,7 @@ $("catAdd").onclick = () => {
   if (v && !cats.includes(v)) { cats.push(v); saveCats(); renderCats(); render(); }
   $("catInput").value = "";
 };
-$("catClose").onclick = () => $("catDlg").close();
+$("catClose").onclick = () => { $("catDlg").classList.remove("open"); document.body.classList.remove("noscroll"); };
 
 /* ---------- Démarrage ---------- */
 (async () => {
