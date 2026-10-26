@@ -43,7 +43,7 @@
   .tile { position:relative; border-radius:12px; overflow:hidden; background:var(--card); transition:opacity .2s, transform .2s; }
   .tile img { width:100%; aspect-ratio:1; object-fit:cover; display:block; pointer-events:none; }
   .tile.dragging { opacity:.25; transform:scale(.95); }
-  .price { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.75); color:var(--acc); z-index:4;
+  .price { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.75); color:var(--acc); z-index:5;
            padding:4px 10px; border-radius:999px; font-weight:700; font-size:15px; }
   #empty { text-align:center; opacity:.6; padding:40px 20px; }
 
@@ -113,7 +113,7 @@
   .imgwrap { flex:1; min-height:0; position:relative; }
   #viewImg { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; transition:opacity .4s; }
   .nav { position:absolute; top:50%; transform:translateY(-50%); font-size:34px; width:60px; height:80px;
-         background:rgba(255,255,255,.12); z-index:5; }
+         background:rgba(255,255,255,.12); z-index:6; }
   #prevBtn { left:0; } #nextBtn { right:0; }
   #viewTags { text-align:center; font-size:16px; opacity:.75; padding:6px 0 0; }
   #editPanel { display:none; max-height:42vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
@@ -161,15 +161,14 @@
   .wm[data-wp="bl"] .logo { bottom:3%; left:3%; }
   .wm[data-wp="br"] .logo { bottom:3%; right:3%; }
   .wm[data-wp="c"]  .logo { top:50%; left:50%; transform:translate(-50%,-50%); width:calc(var(--wmW) * 2); }
+  /* Diagonale ⟋ */
   .wm[data-wp="diag"] .logo { inset:-60%; width:auto; aspect-ratio:auto; background-repeat:repeat;
                               background-size:var(--wmTile); transform:rotate(-30deg); }
   .tile .wm[data-wp="diag"] .logo { background-size:calc(var(--wmTile) / 2); }
-  /* Bande diagonale : une seule ligne de logos qui traverse le dessin */
   .wm[data-wp="band"] .logo { left:-30%; right:-30%; top:50%; width:auto; aspect-ratio:auto; height:var(--wmTile);
                               background-repeat:repeat-x; background-size:auto 100%; background-position:center;
                               transform:translateY(-50%) rotate(-30deg); }
   .tile .wm[data-wp="band"] .logo { height:calc(var(--wmTile) / 2); }
-  /* Plusieurs lignes en diagonale (3 bandes espacées) */
   .wm[data-wp="lines"] .logo { left:-40%; right:-40%; width:auto; aspect-ratio:auto; height:calc(var(--wmTile) * .8);
                                background-repeat:repeat-x; background-size:auto 100%; background-position:center;
                                transform:translateY(-50%) rotate(-30deg); }
@@ -177,8 +176,37 @@
   .wm[data-wp="lines"] .logo.l2 { top:50%; }
   .wm[data-wp="lines"] .logo.l3 { top:82%; }
   .tile .wm[data-wp="lines"] .logo { height:calc(var(--wmTile) * .4); }
-  /* Logo seul, incliné au centre */
   .wm[data-wp="tilt"] .logo { top:50%; left:50%; width:calc(var(--wmW) * 2.2); transform:translate(-50%,-50%) rotate(-30deg); }
+  /* Diagonale ⟍ (autre sens) */
+  .wm[data-wp="diag2"] .logo { inset:-60%; width:auto; aspect-ratio:auto; background-repeat:repeat;
+                               background-size:var(--wmTile); transform:rotate(30deg); }
+  .tile .wm[data-wp="diag2"] .logo { background-size:calc(var(--wmTile) / 2); }
+  .wm[data-wp="band2"] .logo { left:-30%; right:-30%; top:50%; width:auto; aspect-ratio:auto; height:var(--wmTile);
+                               background-repeat:repeat-x; background-size:auto 100%; background-position:center;
+                               transform:translateY(-50%) rotate(30deg); }
+  .tile .wm[data-wp="band2"] .logo { height:calc(var(--wmTile) / 2); }
+  .wm[data-wp="lines2"] .logo { left:-40%; right:-40%; width:auto; aspect-ratio:auto; height:calc(var(--wmTile) * .8);
+                                background-repeat:repeat-x; background-size:auto 100%; background-position:center;
+                                transform:translateY(-50%) rotate(30deg); }
+  .wm[data-wp="lines2"] .logo.l1 { top:18%; }
+  .wm[data-wp="lines2"] .logo.l2 { top:50%; }
+  .wm[data-wp="lines2"] .logo.l3 { top:82%; }
+  .tile .wm[data-wp="lines2"] .logo { height:calc(var(--wmTile) * .4); }
+  .wm[data-wp="tilt2"] .logo { top:50%; left:50%; width:calc(var(--wmW) * 2.2); transform:translate(-50%,-50%) rotate(30deg); }
+  /* Logo « photo interdite » : mêmes emplacements, toujours bien visible */
+  .wm.np { z-index:4; }
+  .wm.np.on { display:block; }
+  .wm.np .logo { background-image:url(interdit-photo.jpg); }
+  /* L'image est un JPG (sans transparence) : on la découpe en rond pour cacher les coins */
+  .wm.np[data-wp="tl"] .logo, .wm.np[data-wp="tr"] .logo, .wm.np[data-wp="bl"] .logo, .wm.np[data-wp="br"] .logo,
+  .wm.np[data-wp="c"] .logo, .wm.np[data-wp="tilt"] .logo, .wm.np[data-wp="tilt2"] .logo {
+    border-radius:50%; background-size:116%; background-position:center; }
+  .wm.np .copy { display:none; }
+  /* Prix « À définir » */
+  .priceRow { display:flex; gap:12px; align-items:center; }
+  .priceRow input[type=text] { flex:1; }
+  .check.tbd { margin:0; white-space:nowrap; font-size:16px; }
+  input[type=text]:disabled { opacity:.35; }
   /* Export / import */
   .ioBtns { display:flex; flex-wrap:wrap; gap:10px; }
   #ioStatus { margin-top:8px; font-size:15px; color:var(--acc); min-height:20px; }
@@ -186,7 +214,7 @@
               opacity:.5; text-shadow:0 0 3px #000; letter-spacing:.5px; white-space:nowrap; }
   .wm[data-wp="bl"] .copy { left:auto; right:3%; }
   .wm.nocopy .copy, .tile .wm .copy { display:none; }
-  #viewWm { inset:auto; transition:opacity .4s; }
+  #viewWm, #viewNp { inset:auto; transition:opacity .4s; }
 </style>
 </head>
 <body>
@@ -225,10 +253,15 @@
     <label>Catégories</label>
     <div id="addCats"></div>
     <label>Prix (facultatif)</label>
-    <input type="text" id="addPrice" placeholder="ex : 80  ou  à partir de 120 €">
+    <div class="priceRow">
+      <input type="text" id="addPrice" placeholder="ex : 80  ou  à partir de 120 €">
+      <label class="check tbd"><input type="checkbox" id="addTbd"> À définir</label>
+    </div>
     <p class="hint">Le même prix et les mêmes réglages seront appliqués à toutes les photos sélectionnées. Modifiables ensuite.</p>
     <label>Filigrane</label>
     <div id="addWmBox" class="wmBox"></div>
+    <label>🚫 Logo « photo interdite »</label>
+    <div id="addNpBox" class="wmBox"></div>
     <div class="row">
       <button type="button" id="addCancel">Annuler</button>
       <button type="button" class="primary" id="addOk">＋ Ajouter</button>
@@ -241,6 +274,7 @@
   <div class="imgwrap">
     <img id="viewImg" alt="">
     <div class="wm" id="viewWm"></div>
+    <div class="wm np" id="viewNp"></div>
     <button type="button" class="nav" id="prevBtn">‹</button>
     <button type="button" class="nav" id="nextBtn">›</button>
   </div>
@@ -248,12 +282,17 @@
   <div id="editPanel" class="admin">
     <h4>💶 Prix</h4>
     <div class="row" style="margin-top:0;justify-content:stretch">
-      <input type="text" id="editPrice" placeholder="Prix (facultatif) — enregistré automatiquement">
+      <div class="priceRow" style="flex:1">
+        <input type="text" id="editPrice" placeholder="Prix (facultatif) — enregistré automatiquement">
+        <label class="check tbd"><input type="checkbox" id="editTbd"> À définir</label>
+      </div>
     </div>
     <h4>🗂️ Catégories</h4>
     <div id="viewCats"></div>
     <h4>© Filigrane</h4>
     <div id="viewWmBox" class="wmBox"></div>
+    <h4>🚫 Logo « photo interdite »</h4>
+    <div id="viewNpBox" class="wmBox"></div>
   </div>
   <div id="ctrlBar">
     <span id="viewPrice"></span>
@@ -346,7 +385,7 @@ const DEFAULT_CATS = ["🌸 Florale","🌙 Signe astro","✨ Minimaliste","⚓ O
                       "✍️ Lettrage","🐾 Animaux","🔷 Géométrique","📷 Réaliste","❓ Autre"];
 let cats = JSON.parse(localStorage.getItem("cats") || "null") || DEFAULT_CATS;
 let filter = null, photos = [], db, pending = [], current = null, viewList = [];
-let getAddCats = () => [], addWmCfg = {}, viewerDirty = false;
+let getAddCats = () => [], addWmCfg = {}, addNpCfg = {}, viewerDirty = false;
 const urls = new Map();
 const $ = id => document.getElementById(id);
 const LS = (k, d) => { const v = localStorage.getItem(k); return v === null ? d : v; };
@@ -376,44 +415,73 @@ function wmOf(p) {
     wmCopy: p.wmCopy === undefined ? WM_DEF.wmCopy : p.wmCopy
   };
 }
-function applyWmEl(el, p) {
-  const c = wmOf(p), sz = WM_SIZES[c.wmSize] || WM_SIZES.m;
-  el.classList.add("wm");
-  el.classList.toggle("on", c.wm);
-  el.classList.toggle("nocopy", !c.wmCopy);
-  el.dataset.wp = c.wmPos;
+function paintLayer(el, on, pos, size, op, copy) {
+  const sz = WM_SIZES[size] || WM_SIZES.m;
+  el.classList.toggle("on", on);
+  el.classList.toggle("nocopy", !copy);
+  el.dataset.wp = pos;
   el.style.setProperty("--wmW", sz[0]);
   el.style.setProperty("--wmTile", sz[1]);
-  el.style.setProperty("--wmOp", c.wmOp);
+  el.style.setProperty("--wmOp", op);
   const name = LS("title", "");
-  el.innerHTML = c.wmPos === "lines"
+  el.innerHTML = String(pos).startsWith("lines")
     ? '<div class="logo l1"></div><div class="logo l2"></div><div class="logo l3"></div><div class="copy"></div>'
     : '<div class="logo"></div><div class="copy"></div>';
   el.querySelector(".copy").textContent = "© " + (name ? name + " " : "") + new Date().getFullYear();
 }
+function applyWmEl(el, p) {
+  const c = wmOf(p);
+  el.classList.add("wm");
+  paintLayer(el, c.wm, c.wmPos, c.wmSize, c.wmOp, c.wmCopy);
+}
+function npOf(p) {
+  return { np: !!p.np, npPos: p.npPos || WM_DEF.npPos || "tr", npSize: p.npSize || WM_DEF.npSize || "s" };
+}
+function applyNpEl(el, p) {
+  const c = npOf(p);
+  el.classList.add("wm", "np");
+  paintLayer(el, c.np, c.npPos, c.npSize, "0.9", false);
+}
+const POS_OPTS = `
+  <option value="br">↘ En bas à droite</option>
+  <option value="bl">↙ En bas à gauche</option>
+  <option value="tr">↗ En haut à droite</option>
+  <option value="tl">↖ En haut à gauche</option>
+  <option value="c">⊙ Au centre</option>
+  <optgroup label="Diagonale ⟋">
+    <option value="diag">⟋ Tout le dessin</option>
+    <option value="band">⟋ Une bande</option>
+    <option value="lines">⟋ Plusieurs lignes</option>
+    <option value="tilt">⟋ Logo incliné au centre</option>
+  </optgroup>
+  <optgroup label="Diagonale ⟍">
+    <option value="diag2">⟍ Tout le dessin</option>
+    <option value="band2">⟍ Une bande</option>
+    <option value="lines2">⟍ Plusieurs lignes</option>
+    <option value="tilt2">⟍ Logo incliné au centre</option>
+  </optgroup>`;
+const SIZE_OPTS = `<option value="s">Petit</option><option value="m">Moyen</option><option value="l">Grand</option>`;
+function bindOpts(box, obj, onKey, onChange) {
+  const opts = box.querySelector(".wmOpts");
+  box.querySelectorAll("[data-k]").forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === "checkbox") el.checked = !!obj[k]; else el.value = obj[k];
+    el.onchange = () => {
+      obj[k] = el.type === "checkbox" ? el.checked : el.value;
+      opts.classList.toggle("off", !obj[onKey]);
+      if (onChange) onChange();
+    };
+  });
+  opts.classList.toggle("off", !obj[onKey]);
+}
 /* Panneau de réglage du filigrane, pour un objet (dessin ou ajout) */
 function wmControls(box, obj, onChange) {
-  const c = wmOf(obj);
-  Object.assign(obj, c);
+  Object.assign(obj, wmOf(obj));
   box.innerHTML = `
     <label class="check" style="margin-top:0"><input type="checkbox" data-k="wm"> Activer le filigrane</label>
     <div class="wmOpts">
-      <select data-k="wmPos">
-        <option value="br">↘ En bas à droite</option>
-        <option value="bl">↙ En bas à gauche</option>
-        <option value="tr">↗ En haut à droite</option>
-        <option value="tl">↖ En haut à gauche</option>
-        <option value="c">⊙ Au centre</option>
-        <option value="diag">⟋ En diagonale (tout le dessin)</option>
-        <option value="band">⟋ Bande en diagonale</option>
-        <option value="lines">⟋ Plusieurs lignes en diagonale</option>
-        <option value="tilt">⤴ Logo incliné au centre</option>
-      </select>
-      <select data-k="wmSize">
-        <option value="s">Petit</option>
-        <option value="m">Moyen</option>
-        <option value="l">Grand</option>
-      </select>
+      <select data-k="wmPos">${POS_OPTS}</select>
+      <select data-k="wmSize">${SIZE_OPTS}</select>
       <select data-k="wmOp">
         <option value="0.06">Ultra discret</option>
         <option value="0.12">Très discret</option>
@@ -423,17 +491,18 @@ function wmControls(box, obj, onChange) {
       </select>
       <label class="check small"><input type="checkbox" data-k="wmCopy"> Texte ©</label>
     </div>`;
-  const opts = box.querySelector(".wmOpts");
-  box.querySelectorAll("[data-k]").forEach(el => {
-    const k = el.dataset.k;
-    if (el.type === "checkbox") el.checked = !!obj[k]; else el.value = obj[k];
-    el.onchange = () => {
-      obj[k] = el.type === "checkbox" ? el.checked : el.value;
-      opts.classList.toggle("off", !obj.wm);
-      if (onChange) onChange();
-    };
-  });
-  opts.classList.toggle("off", !obj.wm);
+  bindOpts(box, obj, "wm", onChange);
+}
+/* Panneau du logo « photo interdite » */
+function npControls(box, obj, onChange) {
+  Object.assign(obj, npOf(obj));
+  box.innerHTML = `
+    <label class="check" style="margin-top:0"><input type="checkbox" data-k="np"> Afficher le logo « photo interdite »</label>
+    <div class="wmOpts">
+      <select data-k="npPos">${POS_OPTS}</select>
+      <select data-k="npSize">${SIZE_OPTS}</select>
+    </div>`;
+  bindOpts(box, obj, "np", onChange);
 }
 
 /* ---------- Sélecteur de catégories : menu déroulant + bouton + ---------- */
@@ -482,6 +551,8 @@ function fmtPrice(v) {
   if (!v) return "";
   return /^\d+([.,]\d+)?$/.test(v) ? v + " €" : v;
 }
+const priceText = p => p.tbd ? "À définir" : fmtPrice(p.price);
+$("addTbd").onchange = e => { $("addPrice").disabled = e.target.checked; };
 
 /* ---------- Clavier à chiffres ---------- */
 let pinValue = "", pinResolve = null;
@@ -569,7 +640,7 @@ function resize(file) {
     img.src = u;
   });
 }
-/* Les images sont maintenant stockées en données brutes (ArrayBuffer) : plus fiable sur iPad que les Blob */
+/* Les images sont stockées en données brutes (ArrayBuffer) : plus fiable sur iPad que les Blob */
 function blobOf(p) { return p.buf ? new Blob([p.buf], { type: p.type || "image/jpeg" }) : p.blob; }
 function urlOf(p) {
   if (!urls.has(p.id)) urls.set(p.id, URL.createObjectURL(blobOf(p)));
@@ -596,8 +667,9 @@ function render() {
     const tile = mk("div", { className: "tile" });
     const img = mk("img", { src: urlOf(p), loading: "lazy" });
     const wm = mk("div"); applyWmEl(wm, p);
-    tile.append(img, wm);
-    const pr = fmtPrice(p.price);
+    const np = mk("div"); applyNpEl(np, p);
+    tile.append(img, wm, np);
+    const pr = priceText(p);
     if (pr) tile.append(mk("span", { className: "price", textContent: pr }));
     tile.onclick = () => { if (suppressClick) return; openViewer(i); };
     setupLongPress(tile, p, img);
@@ -696,10 +768,12 @@ $("addBtn").onclick = () => {
   autoArmed = false; clearTimeout(idleTimer);
   pending = [];
   $("count").textContent = "0 photo sélectionnée";
-  $("addPrice").value = "";
+  $("addPrice").value = ""; $("addPrice").disabled = false; $("addTbd").checked = false;
   getAddCats = catPicker($("addCats"), filter ? [filter] : []);
   addWmCfg = { wm: true };
   wmControls($("addWmBox"), addWmCfg);
+  addNpCfg = {};
+  npControls($("addNpBox"), addNpCfg);
   openP("addDlg");
 };
 $("pickBtn").onclick = () => $("fileInput").click();
@@ -714,9 +788,11 @@ $("addOk").onclick = async () => {
   const btn = $("addOk"); btn.disabled = true; btn.textContent = "Ajout…";
   try {
     const price = $("addPrice").value.trim(), styles = getAddCats();
-    const w = { wm: addWmCfg.wm, wmPos: addWmCfg.wmPos, wmSize: addWmCfg.wmSize, wmOp: addWmCfg.wmOp, wmCopy: addWmCfg.wmCopy };
-    localStorage.setItem("wmDef", JSON.stringify({ wmPos: w.wmPos, wmSize: w.wmSize, wmOp: w.wmOp, wmCopy: w.wmCopy }));
-    Object.assign(WM_DEF, { wmPos: w.wmPos, wmSize: w.wmSize, wmOp: w.wmOp, wmCopy: w.wmCopy });
+    const w = { wm: addWmCfg.wm, wmPos: addWmCfg.wmPos, wmSize: addWmCfg.wmSize, wmOp: addWmCfg.wmOp, wmCopy: addWmCfg.wmCopy,
+                np: addNpCfg.np, npPos: addNpCfg.npPos, npSize: addNpCfg.npSize, tbd: $("addTbd").checked };
+    const def = { wmPos: w.wmPos, wmSize: w.wmSize, wmOp: w.wmOp, wmCopy: w.wmCopy, npPos: w.npPos, npSize: w.npSize };
+    localStorage.setItem("wmDef", JSON.stringify(def));
+    Object.assign(WM_DEF, def);
     let t = Date.now();
     for (const f of pending) {
       const blob = await resize(f);
@@ -737,13 +813,14 @@ function placeWm() {
   const cw = box.clientWidth, ch = box.clientHeight;
   const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
   const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
-  Object.assign(w.style, { left: (cw - iw) / 2 + "px", top: (ch - ih) / 2 + "px", width: iw + "px", height: ih + "px" });
+  const st = { left: (cw - iw) / 2 + "px", top: (ch - ih) / 2 + "px", width: iw + "px", height: ih + "px" };
+  Object.assign(w.style, st); Object.assign($("viewNp").style, st);
 }
 $("viewImg").addEventListener("load", placeWm);
 window.addEventListener("resize", () => requestAnimationFrame(placeWm));
 
 function updateInfo() {
-  const pr = fmtPrice(current.price);
+  const pr = priceText(current);
   $("viewPrice").textContent = pr ? "Prix : " + pr : "";
   $("viewTags").textContent = current.styles.join("  ·  ");
 }
@@ -753,16 +830,22 @@ function showCurrent() {
   const photo = current;
   $("viewImg").src = urlOf(photo);
   applyWmEl($("viewWm"), photo);
+  applyNpEl($("viewNp"), photo);
   updateInfo();
   $("prevBtn").style.visibility = idx > 0 ? "visible" : "hidden";
   $("nextBtn").style.visibility = idx < viewList.length - 1 ? "visible" : "hidden";
   if (!playing && !isLocked()) {
     $("editPrice").value = photo.price || "";
+    $("editTbd").checked = !!photo.tbd;
+    $("editPrice").disabled = !!photo.tbd;
     catPicker($("viewCats"), photo.styles, async v => {
       photo.styles = v; updateInfo(); viewerDirty = true; await savePhoto(photo);
     });
     wmControls($("viewWmBox"), photo, async () => {
       applyWmEl($("viewWm"), photo); placeWm(); viewerDirty = true; await savePhoto(photo);
+    });
+    npControls($("viewNpBox"), photo, async () => {
+      applyNpEl($("viewNp"), photo); placeWm(); viewerDirty = true; await savePhoto(photo);
     });
   }
   requestAnimationFrame(placeWm);
@@ -792,6 +875,11 @@ function commitPrice() {
   if (v !== (current.price || "")) { current.price = v; savePhoto(current); updateInfo(); viewerDirty = true; }
 }
 $("editPrice").addEventListener("change", commitPrice);
+$("editTbd").onchange = async e => {
+  current.tbd = e.target.checked;
+  $("editPrice").disabled = current.tbd;
+  await savePhoto(current); updateInfo(); viewerDirty = true;
+};
 $("saveCloseBtn").onclick = closeViewer;
 
 const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>';
@@ -823,9 +911,9 @@ document.addEventListener("webkitfullscreenchange", () => requestAnimationFrame(
 let playing = false, slideTimer = null;
 const slideDelay = () => Number(LS("slideDelay", "5")) * 1000;
 function nextSlide() {
-  const img = $("viewImg"), wm = $("viewWm");
-  img.style.opacity = 0; wm.style.opacity = 0;
-  setTimeout(() => { idx = (idx + 1) % viewList.length; showCurrent(); img.style.opacity = 1; wm.style.opacity = 1; }, 400);
+  const img = $("viewImg"), wm = $("viewWm"), np = $("viewNp");
+  img.style.opacity = 0; wm.style.opacity = 0; np.style.opacity = 0;
+  setTimeout(() => { idx = (idx + 1) % viewList.length; showCurrent(); img.style.opacity = 1; wm.style.opacity = 1; np.style.opacity = 1; }, 400);
 }
 function startSlide(fromStart, auto) {
   if (!viewList.length) { if (!auto) alert("Aucun dessin à afficher."); return; }
@@ -842,7 +930,7 @@ function stopSlide() {
   const was = playing;
   playing = false; document.body.classList.remove("playing");
   clearInterval(slideTimer); $("slideBtn").innerHTML = ICON_PLAY;
-  $("viewImg").style.opacity = 1; $("viewWm").style.opacity = 1;
+  $("viewImg").style.opacity = 1; $("viewWm").style.opacity = 1; $("viewNp").style.opacity = 1;
   if (isOpen("viewer")) showCurrent();
   if (was) armIdle();
 }
