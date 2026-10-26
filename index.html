@@ -198,6 +198,9 @@
   /* Logo « photo interdite » : 4 coins, toujours bien visible */
   .wm.np { z-index:4; }
   .wm.np.on { display:block; }
+  body.npOff .wm.np { display:none !important; }
+  /* Logo 🚫 en bas : remonté au-dessus de la ligne du © (en grand ; le © est caché sur les miniatures) */
+  #viewNp[data-wp="bl"] .logo, #viewNp[data-wp="br"] .logo { bottom:calc(3% + 14px); }
   .wm.np .logo { background:url(interdit-photo.png) center/contain no-repeat; opacity:1; }
   .wm.np .copy { display:none; }
   /* Prix « À définir » */
@@ -208,7 +211,7 @@
   /* Export / import */
   .ioBtns { display:flex; flex-wrap:wrap; gap:10px; }
   #ioStatus { margin-top:8px; font-size:15px; color:var(--acc); min-height:20px; }
-  .wm .copy { position:absolute; left:3%; bottom:3%; color:#fff; font-size:12px; font-weight:500;
+  .wm .copy { position:absolute; left:3%; bottom:4px; color:#fff; font-size:12px; font-weight:500;
               opacity:.5; text-shadow:0 0 3px #000; letter-spacing:.5px; white-space:nowrap; }
   .wm[data-wp="bl"] .copy { left:auto; right:3%; }
   .wm.nocopy .copy, .tile .wm .copy { display:none; }
@@ -323,7 +326,10 @@
 
     <h3 class="sec">© Filigrane</h3>
     <label class="check"><input type="checkbox" id="showWm"> Afficher le filigrane</label>
-    <p class="hint">La position, la taille et l'intensité se règlent sur chaque dessin (bouton ✏️ quand un dessin est ouvert).</p>
+
+    <h3 class="sec">🚫 Logo « photo interdite »</h3>
+    <label class="check"><input type="checkbox" id="showNp"> Afficher le logo « photo interdite »</label>
+    <p class="hint">Décoché : le logo est caché sur tous les dessins, sans perdre les réglages de chaque dessin. La position et la taille du filigrane et du logo se règlent sur chaque dessin (bouton ✏️).</p>
 
     <h3 class="sec">▶️ Diaporama</h3>
     <div class="grid2">
@@ -404,6 +410,9 @@ const WM_DEF = Object.assign({ wmPos: "br", wmSize: "m", wmOp: "0.25", wmCopy: t
 const showWm = () => LS("showWm", "1") === "1";
 function applyShowWm() { document.body.classList.toggle("wmShow", showWm()); }
 $("showWm").onchange = e => { localStorage.setItem("showWm", e.target.checked ? "1" : "0"); applyShowWm(); };
+const showNp = () => LS("showNp", "1") === "1";
+function applyShowNp() { document.body.classList.toggle("npOff", !showNp()); }
+$("showNp").onchange = e => { localStorage.setItem("showNp", e.target.checked ? "1" : "0"); applyShowNp(); };
 function wmOf(p) {
   return {
     wm: p.wm !== false,
@@ -589,7 +598,7 @@ $("lockBtn").onclick = async () => {
   const c2 = await askPin("Confirme le code");
   if (c2 !== code) { alert("Les codes ne correspondent pas."); return; }
   localStorage.setItem("code", code); localStorage.setItem("locked", "1"); applyLock(); render();
-  alert("Verrouillé ✅\nPour déverrouiller : touche 5 fois le logo ou le titre, puis entre ton code.");
+  alert("Verrouillé ✅\nPour déverrouiller : touche 5 fois le logo ou le titre, puis entre ton code.\n\nAstuce : appuie 3 fois sur le bouton de l'iPad pour lancer l'« Accès guidé » et empêcher de quitter l'app.");
 };
 let taps = 0, tapTimer;
 $("brand").onclick = async () => {
@@ -770,7 +779,7 @@ function setupLongPress(tile, p, img) {
 async function refreshData() {
   if (!db || drag || isOpen("viewer") || isOpen("addDlg")) return;
   cats = JSON.parse(localStorage.getItem("cats") || "null") || cats;
-  applyTitle(); applyLock(); applyPrices(); applyShowWm();
+  applyTitle(); applyLock(); applyPrices(); applyShowWm(); applyShowNp();
   await loadAll(); render();
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshData(); });
@@ -1038,6 +1047,7 @@ $("catBtn").onclick = () => {
   $("titleInput").value = currentTitle();
   $("showPrices").checked = showPrices();
   $("showWm").checked = showWm();
+  $("showNp").checked = showNp();
   $("slideDelay").value = LS("slideDelay", "5");
   $("autoRestart").value = LS("autoRestart", "0");
   renderCats(); openP("catDlg");
@@ -1056,7 +1066,7 @@ $("catClose").onclick = () => {
 };
 
 /* ---------- Export / import de toute la configuration ---------- */
-const CFG_KEYS = ["title", "showPrices", "showWm", "slideDelay", "autoRestart", "wmDef", "cats"];
+const CFG_KEYS = ["title", "showPrices", "showWm", "showNp", "slideDelay", "autoRestart", "wmDef", "cats"];
 const ioMsg = t => $("ioStatus").textContent = t;
 function readAsDataURL(b) {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
@@ -1176,9 +1186,9 @@ $("importInput").onchange = async e => {
       ioMsg(`⏳ Import… ${i + 1} / ${data.photos.length}`);
     }
     Object.assign(WM_DEF, JSON.parse(LS("wmDef", "{}")));
-    applyTitle(); applyPrices(); applyShowWm();
+    applyTitle(); applyPrices(); applyShowWm(); applyShowNp();
     $("titleInput").value = currentTitle();
-    $("showPrices").checked = showPrices(); $("showWm").checked = showWm();
+    $("showPrices").checked = showPrices(); $("showWm").checked = showWm(); $("showNp").checked = showNp();
     $("slideDelay").value = LS("slideDelay", "5"); $("autoRestart").value = LS("autoRestart", "0");
     filter = null; await loadAll(); renderCats(); render();
     ioMsg(`✅ Import terminé : ${data.photos.length} dessin(s).`);
@@ -1187,7 +1197,7 @@ $("importInput").onchange = async e => {
 
 /* ---------- Démarrage ---------- */
 (async () => {
-  applyTitle(); applyLock(); applyPrices(); applyShowWm();
+  applyTitle(); applyLock(); applyPrices(); applyShowWm(); applyShowNp();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
   try { db = await openDB(); await loadAll(); } catch (e) { alert("Erreur de stockage : " + e); }
