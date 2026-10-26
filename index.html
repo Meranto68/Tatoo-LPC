@@ -130,6 +130,10 @@
   .round svg { width:22px; height:22px; fill:#fff; pointer-events:none; }
   .round.del { background:#b3261e; }
   body.editing #editBtn { background:var(--acc); }
+  /* Bouton texte « Enregistrer » qui remplace la croix pendant la modification */
+  #saveCloseBtn { display:none; border-radius:999px; padding:0 18px; height:46px; font-weight:600; white-space:nowrap; }
+  body.editing #saveCloseBtn { display:block; }
+  body.editing #closeBtn { display:none; }
 
   /* Diaporama */
   body.playing #viewer { padding:0; }
@@ -165,6 +169,14 @@
                               background-repeat:repeat-x; background-size:auto 100%; background-position:center;
                               transform:translateY(-50%) rotate(-30deg); }
   .tile .wm[data-wp="band"] .logo { height:calc(var(--wmTile) / 2); }
+  /* Plusieurs lignes en diagonale (3 bandes espacées) */
+  .wm[data-wp="lines"] .logo { left:-40%; right:-40%; width:auto; aspect-ratio:auto; height:calc(var(--wmTile) * .8);
+                               background-repeat:repeat-x; background-size:auto 100%; background-position:center;
+                               transform:translateY(-50%) rotate(-30deg); }
+  .wm[data-wp="lines"] .logo.l1 { top:18%; }
+  .wm[data-wp="lines"] .logo.l2 { top:50%; }
+  .wm[data-wp="lines"] .logo.l3 { top:82%; }
+  .tile .wm[data-wp="lines"] .logo { height:calc(var(--wmTile) * .4); }
   /* Logo seul, incliné au centre */
   .wm[data-wp="tilt"] .logo { top:50%; left:50%; width:calc(var(--wmW) * 2.2); transform:translate(-50%,-50%) rotate(-30deg); }
   /* Export / import */
@@ -219,7 +231,7 @@
     <div id="addWmBox" class="wmBox"></div>
     <div class="row">
       <button type="button" id="addCancel">Annuler</button>
-      <button type="button" class="primary" id="addOk">Valider</button>
+      <button type="button" class="primary" id="addOk">＋ Ajouter</button>
     </div>
   </div>
 </div>
@@ -236,8 +248,7 @@
   <div id="editPanel" class="admin">
     <h4>💶 Prix</h4>
     <div class="row" style="margin-top:0;justify-content:stretch">
-      <input type="text" id="editPrice" placeholder="Prix (facultatif)">
-      <button type="button" class="green" id="savePrice">💾 Enregistrer</button>
+      <input type="text" id="editPrice" placeholder="Prix (facultatif) — enregistré automatiquement">
     </div>
     <h4>🗂️ Catégories</h4>
     <div id="viewCats"></div>
@@ -254,6 +265,7 @@
     <button type="button" class="round" id="closeBtn" aria-label="Fermer">
       <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
     </button>
+    <button type="button" class="green admin" id="saveCloseBtn">✔ Enregistrer et fermer</button>
   </div>
 </div>
 
@@ -261,13 +273,12 @@
 <div id="catDlg">
   <div class="dlgHead">
     <h2>⚙️ Réglages</h2>
-    <button type="button" class="primary" id="catClose">Terminé</button>
+    <button type="button" class="green" id="catClose">✔ Enregistrer et fermer</button>
   </div>
   <div class="dlgBody"><div class="dlgInner">
     <h3 class="sec">🏷️ Titre affiché</h3>
     <div class="row" style="justify-content:stretch;margin-top:0">
       <input type="text" id="titleInput" placeholder="ex : LP Ink">
-      <button type="button" class="green" id="titleSave">💾 Enregistrer</button>
     </div>
 
     <h3 class="sec">💶 Prix</h3>
@@ -375,7 +386,9 @@ function applyWmEl(el, p) {
   el.style.setProperty("--wmTile", sz[1]);
   el.style.setProperty("--wmOp", c.wmOp);
   const name = LS("title", "");
-  el.innerHTML = '<div class="logo"></div><div class="copy"></div>';
+  el.innerHTML = c.wmPos === "lines"
+    ? '<div class="logo l1"></div><div class="logo l2"></div><div class="logo l3"></div><div class="copy"></div>'
+    : '<div class="logo"></div><div class="copy"></div>';
   el.querySelector(".copy").textContent = "© " + (name ? name + " " : "") + new Date().getFullYear();
 }
 /* Panneau de réglage du filigrane, pour un objet (dessin ou ajout) */
@@ -393,6 +406,7 @@ function wmControls(box, obj, onChange) {
         <option value="c">⊙ Au centre</option>
         <option value="diag">⟋ En diagonale (tout le dessin)</option>
         <option value="band">⟋ Bande en diagonale</option>
+        <option value="lines">⟋ Plusieurs lignes en diagonale</option>
         <option value="tilt">⤴ Logo incliné au centre</option>
       </select>
       <select data-k="wmSize">
@@ -450,7 +464,7 @@ function catPicker(box, initial, onChange) {
       wrap.append(row);
     });
     if (list.length < cats.length) {
-      wrap.append(mk("button", { type: "button", className: "catAdd", textContent: "＋ Ajouter une catégorie",
+      wrap.append(mk("button", { type: "button", className: "catAdd primary", textContent: "＋ Ajouter une catégorie",
         onclick: () => { list.push(""); draw(); } }));
     }
     box.append(wrap);
@@ -707,7 +721,7 @@ $("addOk").onclick = async () => {
       await savePhoto(Object.assign({ id: String(t) + Math.random().toString(36).slice(2), blob, styles, price, date: t++ }, w));
     }
   } catch (e) { alert("Erreur pendant l'ajout : " + e); }
-  btn.disabled = false; btn.textContent = "Valider";
+  btn.disabled = false; btn.textContent = "＋ Ajouter";
   closeP("addDlg");
   await loadAll(); render();
 };
@@ -752,11 +766,12 @@ function showCurrent() {
 }
 function openViewer(i) { idx = i; viewerDirty = false; openP("viewer"); showCurrent(); }
 function closeViewer() {
+  commitPrice();
   stopSlide(); exitFS(); closeP("viewer");
   document.body.classList.remove("editing");
   if (viewerDirty) { viewerDirty = false; render(); }
 }
-function go(d) { const n = idx + d; if (n >= 0 && n < viewList.length) { idx = n; showCurrent(); } }
+function go(d) { const n = idx + d; if (n >= 0 && n < viewList.length) { commitPrice(); idx = n; showCurrent(); } }
 $("prevBtn").onclick = () => go(-1);
 $("nextBtn").onclick = () => go(1);
 let sx = null;
@@ -767,12 +782,14 @@ $("viewImg").addEventListener("touchend", e => {
   if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
 });
 $("editBtn").onclick = () => { document.body.classList.toggle("editing"); requestAnimationFrame(placeWm); };
-$("savePrice").onclick = async () => {
-  current.price = $("editPrice").value.trim();
-  await savePhoto(current); updateInfo(); viewerDirty = true;
-  $("savePrice").textContent = "✅ Enregistré";
-  setTimeout(() => $("savePrice").textContent = "💾 Enregistrer", 1200);
-};
+/* Le prix est enregistré automatiquement (en quittant le champ, en changeant de dessin ou en fermant) */
+function commitPrice() {
+  if (!current || playing || isLocked() || !document.body.classList.contains("editing")) return;
+  const v = $("editPrice").value.trim();
+  if (v !== (current.price || "")) { current.price = v; savePhoto(current); updateInfo(); viewerDirty = true; }
+}
+$("editPrice").addEventListener("change", commitPrice);
+$("saveCloseBtn").onclick = closeViewer;
 
 const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>';
 const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
@@ -888,18 +905,17 @@ $("catBtn").onclick = () => {
   renderCats(); openP("catDlg");
   $("catDlg").querySelector(".dlgBody").scrollTop = 0;
 };
-$("titleSave").onclick = () => {
-  localStorage.setItem("title", $("titleInput").value.trim()); applyTitle(); render();
-  $("titleInput").value = currentTitle();
-  $("titleSave").textContent = "✅ Enregistré";
-  setTimeout(() => $("titleSave").textContent = "💾 Enregistrer", 1200);
-};
+/* Tout est enregistré en fermant les réglages */
 $("catAdd").onclick = () => {
   const v = $("catInput").value.trim();
   if (v && !cats.includes(v)) { cats.push(v); saveCats(); renderCats(); render(); }
   $("catInput").value = "";
 };
-$("catClose").onclick = () => { closeP("catDlg"); render(); };
+$("catClose").onclick = () => {
+  localStorage.setItem("title", $("titleInput").value.trim()); applyTitle();
+  if ($("catInput").value.trim()) $("catAdd").onclick(); /* catégorie tapée mais pas encore ajoutée */
+  closeP("catDlg"); render();
+};
 
 /* ---------- Export / import de toute la configuration ---------- */
 const CFG_KEYS = ["title", "showPrices", "showWm", "slideDelay", "autoRestart", "wmDef", "cats"];
