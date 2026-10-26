@@ -1,6 +1,6 @@
 // Permet à l'app de fonctionner SANS Internet (indispensable en convention)
 const CACHE = "flashs-v2";
-const FILES = ["./", "./index.html", "./logo.png", "./interdit-photo.jpg"];
+const FILES = ["./", "./index.html", "./logo.png", "./interdit-photo.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c =>
