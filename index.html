@@ -195,14 +195,10 @@
   .wm[data-wp="lines2"] .logo.l3 { top:82%; }
   .tile .wm[data-wp="lines2"] .logo { height:calc(var(--wmTile) * .4); }
   .wm[data-wp="tilt2"] .logo { top:50%; left:50%; width:calc(var(--wmW) * 2.2); transform:translate(-50%,-50%) rotate(30deg); }
-  /* Logo « photo interdite » : mêmes emplacements, toujours bien visible */
+  /* Logo « photo interdite » : 4 coins, toujours bien visible */
   .wm.np { z-index:4; }
   .wm.np.on { display:block; }
-  .wm.np .logo { background-image:url(interdit-photo.jpg); }
-  /* L'image est un JPG (sans transparence) : on la découpe en rond pour cacher les coins */
-  .wm.np[data-wp="tl"] .logo, .wm.np[data-wp="tr"] .logo, .wm.np[data-wp="bl"] .logo, .wm.np[data-wp="br"] .logo,
-  .wm.np[data-wp="c"] .logo, .wm.np[data-wp="tilt"] .logo, .wm.np[data-wp="tilt2"] .logo {
-    border-radius:50%; background-size:116%; background-position:center; }
+  .wm.np .logo { background:url(interdit-photo.png) center/contain no-repeat; opacity:1; }
   .wm.np .copy { display:none; }
   /* Prix « À définir » */
   .priceRow { display:flex; gap:12px; align-items:center; }
@@ -436,13 +432,16 @@ function applyWmEl(el, p) {
   el.classList.add("wm");
   paintLayer(el, c.wm, c.wmPos, c.wmSize, c.wmOp, c.wmCopy);
 }
+const NP_CORNERS = ["br", "bl", "tr", "tl"];
 function npOf(p) {
-  return { np: !!p.np, npPos: p.npPos || WM_DEF.npPos || "tr", npSize: p.npSize || WM_DEF.npSize || "s" };
+  let pos = p.npPos || WM_DEF.npPos || "tr";
+  if (!NP_CORNERS.includes(pos)) pos = "tr"; /* anciennes positions (diagonales, centre) → en haut à droite */
+  return { np: !!p.np, npPos: pos, npSize: p.npSize || WM_DEF.npSize || "s" };
 }
 function applyNpEl(el, p) {
   const c = npOf(p);
   el.classList.add("wm", "np");
-  paintLayer(el, c.np, c.npPos, c.npSize, "0.9", false);
+  paintLayer(el, c.np, c.npPos, c.npSize, "1", false);
 }
 const POS_OPTS = `
   <option value="br">↘ En bas à droite</option>
@@ -495,13 +494,18 @@ function wmControls(box, obj, onChange) {
     </div>`;
   bindOpts(box, obj, "wm", onChange);
 }
-/* Panneau du logo « photo interdite » */
+/* Panneau du logo « photo interdite » : uniquement les 4 coins */
 function npControls(box, obj, onChange) {
   Object.assign(obj, npOf(obj));
   box.innerHTML = `
     <label class="check" style="margin-top:0"><input type="checkbox" data-k="np"> Afficher le logo « photo interdite »</label>
     <div class="wmOpts">
-      <select data-k="npPos">${POS_OPTS}</select>
+      <select data-k="npPos">
+        <option value="br">↘ En bas à droite</option>
+        <option value="bl">↙ En bas à gauche</option>
+        <option value="tr">↗ En haut à droite</option>
+        <option value="tl">↖ En haut à gauche</option>
+      </select>
       <select data-k="npSize">${SIZE_OPTS}</select>
     </div>`;
   bindOpts(box, obj, "np", onChange);
